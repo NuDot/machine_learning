@@ -58,6 +58,7 @@ for event in tree:
   counter += 1
   if counter > 1:
     break
+
   z = np.zeros((100,50))
   for i in range(tree.N_phot):
     if tree.PE_time[i] > 32.5:# or (not tree.PE_creation[i]):
