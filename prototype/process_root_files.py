@@ -5,6 +5,13 @@ import numpy as np
 from ROOT import TFile
 
 
+def xyz_to_phi_theta(x, y, z):
+   phi = math.atan2(y, x)
+   r = (x**2 + y**2 + z**2)**.5
+   theta = math.acos(z / r)
+   return phi, theta
+
+
 def xyz_to_phi_cos_z(x, y, z):
    phi = math.atan2(y, x)
    r = (x**2 + y**2 + z**2)**.5
@@ -21,8 +28,18 @@ def phi_cos_z_to_row_col(phi, cos_z, rows=100, cols=100):
    return row, col
 
 
+def phi_theta_to_row_col(phi, theta, rows=100, cols=50):
+   # phi is in [-pi, pi], theta is in [0, pi]
+   row = min(rows/2 + (round((rows/2)*phi/math.pi)), rows-1)
+   row = max(row, 0)
+   col = min(cols*theta/math.pi, cols-1);
+   col = max(col, 0)
+   return row, col
+
+
 def xyz_to_row_col(x, y, z):
-   return phi_cos_z_to_row_col(*xyz_to_phi_cos_z(x, y, z))
+   #return phi_cos_z_to_row_col(*xyz_to_phi_cos_z(x, y, z))
+   return phi_theta_to_row_col(*xyz_to_phi_theta(x, y, z))
 
 
 parser = argparse.ArgumentParser()
@@ -41,9 +58,10 @@ for event in tree:
   counter += 1
   if counter > 1:
     break
-  z = np.zeros((100,100))
+
+  z = np.zeros((100,50))
   for i in range(tree.N_phot):
-    if tree.PE_time[i] > 33.5:
+    if tree.PE_time[i] > 32.5:# or (not tree.PE_creation[i]):
       continue
     row, col = xyz_to_row_col(tree.x_hit[i], tree.y_hit[i], tree.z_hit[i])
     z[row][col] += 100
