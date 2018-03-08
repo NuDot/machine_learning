@@ -41,17 +41,24 @@ def xyz_to_row_col(x, y, z):
    #return phi_cos_z_to_row_col(*xyz_to_phi_cos_z(x, y, z))
    return phi_theta_to_row_col(*xyz_to_phi_theta(x, y, z))
 
+def drange2(start, stop, step):
+    numelements = int((stop-start)/float(step))
+    for i in range(numelements+1):
+            yield start + i*step
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--input", default="../sph_out_topology180_center_NoMultScat_100.root")
+parser.add_argument("--input", default="sph_out_topology180_center_NoMultScat_100.root")
+parser.add_argument("--type", "-t", help="Type of MC files, 1 ring or 2 ring", default = 1)
 args = parser.parse_args()
 
+feature_map_collections = np.zeros((((13,11,100,50))))
+initial_time = 32
+final_time = 38
+time_interval =0.5
 
 f1 = TFile(args.input)
 
 tree = f1.Get("epgTree")
-
-print tree
 
 counter = 0
 for event in tree:
@@ -59,16 +66,18 @@ for event in tree:
   if counter > 1:
     break
 
-  z = np.zeros((100,50))
+  feature_map = np.zeros((100,50))
   for i in range(tree.N_phot):
-    if tree.PE_time[i] > 32.5:# or (not tree.PE_creation[i]):
-      continue
     row, col = xyz_to_row_col(tree.x_hit[i], tree.y_hit[i], tree.z_hit[i])
-    z[row][col] += 100
-    if i < 10:
-      print row, col
+    for pressure_time in drange2(initial_time, final_time, time_interval):
+      if (tree.PE_time[i] >= initial_time) and (tree.PE_time[i]  <= pressure_time):
+        time_index = int((pressure_time - 32) / 0.5)
+        for pressure_pe in range (0, 11):
+              if (tree.PE_creation[i]):
+                feature_map_collections[time_index][pressure_pe][row][col] += 10
+              else :
+                feature_map_collections[time_index][pressure_pe][row][col] += pressure_pe
 
-print z
-plt.imshow(z)
+plt.imshow(feature_map_collections[5][7])
 plt.show()
 
