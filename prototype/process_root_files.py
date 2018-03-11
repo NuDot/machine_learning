@@ -73,7 +73,7 @@ for event in tree:
       if (tree.PE_time[i] >= initial_time) and (tree.PE_time[i]  <= pressure_time):
         time_index = int((pressure_time - 32) / 0.5)
         for pressure_pe in range (0, 11):
-              if (tree.PE_creation[i]):
+              if (not tree.PE_creation[i]):
                 feature_map_collections[time_index][pressure_pe][row][col] += 10
               else :
                 feature_map_collections[time_index][pressure_pe][row][col] += pressure_pe
