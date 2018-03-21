@@ -60,7 +60,6 @@ for event in tree:
     break
   ROWS, COLS = 100, 50
   z = np.zeros((ROWS, COLS))
-  for i in range(tree.N_phot):
     if tree.PE_time[i] > 32.5:# or (not tree.PE_creation[i]):
       continue
     row, col = xyz_to_row_col(tree.x_hit[i], tree.y_hit[i], tree.z_hit[i], ROWS, COLS)
