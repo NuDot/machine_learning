@@ -38,9 +38,9 @@ def phi_theta_to_row_col(phi, theta):
    return row, col
 
 
-def xyz_to_row_col(x, y, z):
+def xyz_to_row_col(x, y, z, rows=100, cols=50):
    #return phi_cos_z_to_row_col(*xyz_to_phi_cos_z(x, y, z))
-   return phi_theta_to_row_col(*xyz_to_phi_theta(x, y, z))
+   return phi_theta_to_row_col(*xyz_to_phi_theta(x, y, z), rows=rows, cols=cols)
 
 def drange2(start, stop, step):
     numelements = int((stop-start)/float(step))
@@ -109,5 +109,6 @@ for event in tree:
 
 
 plt.imshow(feature_map_collections[2][0])
+
 plt.show()
 
