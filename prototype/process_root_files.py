@@ -37,9 +37,9 @@ def phi_theta_to_row_col(phi, theta, rows=100, cols=50):
    return row, col
 
 
-def xyz_to_row_col(x, y, z):
+def xyz_to_row_col(x, y, z, rows=100, cols=50):
    #return phi_cos_z_to_row_col(*xyz_to_phi_cos_z(x, y, z))
-   return phi_theta_to_row_col(*xyz_to_phi_theta(x, y, z))
+   return phi_theta_to_row_col(*xyz_to_phi_theta(x, y, z), rows=rows, cols=cols)
 
 
 parser = argparse.ArgumentParser()
@@ -58,11 +58,12 @@ for event in tree:
   counter += 1
   if counter > 1:
     break
-  z = np.zeros((100,50))
+  ROWS, COLS = 100, 50
+  z = np.zeros((ROWS, COLS))
   for i in range(tree.N_phot):
     if tree.PE_time[i] > 32.5:# or (not tree.PE_creation[i]):
       continue
-    row, col = xyz_to_row_col(tree.x_hit[i], tree.y_hit[i], tree.z_hit[i])
+    row, col = xyz_to_row_col(tree.x_hit[i], tree.y_hit[i], tree.z_hit[i], ROWS, COLS)
     z[row][col] += 100
     if i < 10:
       print row, col
