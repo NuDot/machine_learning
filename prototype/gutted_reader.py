@@ -30,7 +30,7 @@ import os.path
 import sys
 import time
 
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 import tensorflow as tf
 
@@ -96,6 +96,10 @@ def show_a_record():
   for d in decoded:
     print(d)
     print(type(d))
+    print(dir(d))
+    plt.imshow(tf.reshape(d, (28, 28)))
+    plt.show()
+    break
 
 
 def inputs(train, batch_size, num_epochs):
