@@ -30,7 +30,7 @@ import os.path
 import sys
 import time
 
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 import tensorflow as tf
 
@@ -86,25 +86,20 @@ def normalize(image, label):
 
 
 def show_a_record():
-  filename = "/tmp/data/test.tfrecords"
+  filename = "data/validation.tfrecords"
   dataset = tf.data.TFRecordDataset(filename)
-  print(type(dataset))
-  print(vars(dataset))
-  print(dataset)
-  print(dataset[0])
-  return###
-  dataset = dataset.map(decode)
-  print(type(dataset))
-  print(vars(dataset))
-  print(dataset)
-  print(dataset[0])
-  #iterator = dataset.make_one_shot_iterator()
-  #print(type(iterator.get_next()))
-  #print((iterator.get_next()))
-  #print((iterator.get_next()[0]))
-  #print((iterator.get_next()[0].eval()))
-  #print((iterator.get_next()[0][0]))
-  #plt.imshow(image)
+  iterator = tfe.Iterator(dataset)
+  for i in iterator:
+    print(i)
+    decoded = decode(i)
+    break
+  for d in decoded:
+    print(d)
+    print(type(d))
+    print(dir(d))
+    plt.imshow(tf.reshape(d, (28, 28)))
+    plt.show()
+    break
 
 
 def inputs(train, batch_size, num_epochs):
