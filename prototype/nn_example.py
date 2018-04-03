@@ -1,7 +1,6 @@
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
-import tqdm
 import random
 
 sess = tf.InteractiveSession()
@@ -72,7 +71,7 @@ with tf.Session() as sess:
     uniq_id = "./logs/lab2part1_"+uuid.uuid1().__str__()[:6]
     summary_writer = tf.summary.FileWriter(uniq_id, graph=tf.get_default_graph())
     training_perf = []
-    for i in tqdm.tqdm(range(num_iterations)):
+    for i in range(num_iterations):
         batch = mnist.train.next_batch(50)
 
         feed_dict = {x: batch[0], y: batch[1]}
