@@ -60,27 +60,10 @@ def rotated(feature_map, theta, phi):
   return feature_map
 
 
-def main():
-  parser = argparse.ArgumentParser()
-  parser.add_argument("--input", default="sph_out_topology180_center_NoMultScat_100.root")
-  parser.add_argument("--type", "-t", help="Type of MC files, 1 ring or 2 ring", default = 1)
-  parser.add_argument("--theta","-th", help="Rotate Camera with given theta(0 - 2pi)",type = float, default = 0)
-  parser.add_argument("--phi","-ph", help="Rotate Camera with given phi(0 - pi)",type = float, default = 0)
-  args = parser.parse_args()
-
-
-
-
+def transcribe_hits(tree, theta, phi):
   first_dimension = int((FINAL_TIME - INITIAL_TIME) / TIME_STEP) + 1
   second_dimension = MAX_PRESSURE + 1
   feature_map_collections = np.zeros((((first_dimension,second_dimension,ROWS,COLS))))
-
-  f1 = TFile(args.input)
-
-  tree = f1.Get("epgTree")
-
-
-
   counter = 0
   for event in tree:
     counter += 1
@@ -98,12 +81,32 @@ def main():
 
     for index_f, first_layer in enumerate(feature_map_collections):
       for index_s, target_map in enumerate(first_layer):
-        target_map = rotated(target_map, theta=args.theta, phi=args.phi)
+        target_map = rotated(target_map, theta=theta, phi=phi)
         feature_map_collections[index_f][index_s] = target_map
 
 
   plt.imshow(feature_map_collections[2][0])
+  plt.show()
 
-plt.show()
+
+
+def main():
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--input", default="sph_out_topology180_center_NoMultScat_100.root")
+  parser.add_argument("--type", "-t", help="Type of MC files, 1 ring or 2 ring", default = 1)
+  parser.add_argument("--theta","-th", help="Rotate Camera with given theta(0 - 2pi)",type = float, default = 0)
+  parser.add_argument("--phi","-ph", help="Rotate Camera with given phi(0 - pi)",type = float, default = 0)
+  args = parser.parse_args()
+
+
+  f1 = TFile(args.input)
+
+  tree = f1.Get("epgTree")
+
+  transcribe_hits(tree, theta=args.theta, phi=args.phi)
+
+
+
+
 
 main()
