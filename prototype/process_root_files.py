@@ -47,6 +47,19 @@ def random_decision(pressure):
     frac_pressure = float(pressure)/float(MAX_PRESSURE)
     return (random()<=frac_pressure)
 
+
+def rotated(feature_map, theta, phi):
+  row_rotation = int(math.fmod(theta, (2 * math.pi)) / (2 * math.pi) * ROWS)
+  col_rotation = int(math.fmod(phi, math.pi) / math.pi * COLS)
+  if not ((row_rotation == 0) or (row_rotation == 1)):
+    top, bottom = np.split(feature_map, [row_rotation], axis=0)
+    feature_map = np.concatenate((bottom, top), axis=0)
+  if not ((col_rotation == 0) or (col_rotation == 1)):
+    left, right = np.split(feature_map, [col_rotation], axis=1)
+    feature_map = np.concatenate((right, left), axis = 1)
+  return feature_map
+
+
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument("--input", default="sph_out_topology180_center_NoMultScat_100.root")
@@ -57,8 +70,6 @@ def main():
 
 
 
-  row_rotation = int(math.fmod(args.theta, (2 * math.pi)) / (2 * math.pi) * ROWS)
-  col_rotation = int(math.fmod(args.phi, math.pi) / math.pi * COLS)
 
   first_dimension = int((FINAL_TIME - INITIAL_TIME) / TIME_STEP) + 1
   second_dimension = MAX_PRESSURE + 1
@@ -87,12 +98,7 @@ def main():
 
     for index_f, first_layer in enumerate(feature_map_collections):
       for index_s, target_map in enumerate(first_layer):
-        if not ((row_rotation == 0) or (row_rotation == 1)):
-          top, bottom = np.split(target_map, [row_rotation], axis=0)
-          target_map = np.concatenate((bottom, top), axis=0)
-        if not ((col_rotation == 0) or (col_rotation == 1)):
-          left, right = np.split(target_map, [col_rotation], axis=1)
-          target_map = np.concatenate((right, left), axis = 1)
+        target_map = rotated(target_map, theta=args.theta, phi=args.phi)
         feature_map_collections[index_f][index_s] = target_map
 
 
