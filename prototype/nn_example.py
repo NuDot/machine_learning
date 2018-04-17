@@ -52,7 +52,7 @@ probabilities = tf.nn.softmax(y_pred)
 # calculate mean cross entropy over entire batch of samples. 
 '''TODO: write a TensorFlow expression for computing the mean cross entropy loss over the entire batch of samples.
 Hint: consider tf.nn.softmax_cross_entropy_with_logits_v2 and pay close attention to the logits input!'''
-cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=y_pred))
+cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=y_pred))
 
 optimizer = tf.train.AdamOptimizer(1e-3).minimize(cross_entropy)
 correct_prediction = tf.equal(tf.argmax(y_pred, 1), tf.argmax(y, 1))
