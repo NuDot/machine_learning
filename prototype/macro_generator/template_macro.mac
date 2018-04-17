@@ -1,0 +1,27 @@
+#!/bin/bash -l
+
+source /project/snoplus/snoing/install/root-5.34.36/bin/thisroot.sh
+source /project/snoplus/snoing/install/geant4.10.0.p02/bin/geant4.sh
+module load python
+
+#This needed to run.
+export GLG4DATA=/projectnb/snoplus/Theia_MC/rat-pac-theia_PMT/data
+
+cd /projectnb/snoplus/Theia_MC/rat-pac-theia_PMT
+scons -c
+./configure
+source env.sh
+scons
+
+#$$ -P snoplus
+
+#$$ -l mem_per_core=8G
+
+#$$ -l h_rt=${TIME}
+
+#$$ -m ea
+
+# Request four cores
+#$$ -pe omp 2
+
+rat ${LOADINPUT} -o ${OUTPUTDIRECTORY}
