@@ -36,9 +36,9 @@ import tensorflow as tf
 
 from tensorflow.examples.tutorials.mnist import mnist
 
-#import tensorflow.contrib.eager as tfe
+import tensorflow.contrib.eager as tfe
 
-#tfe.enable_eager_execution()
+tfe.enable_eager_execution()
 
 # Basic model parameters as external flags.
 FLAGS = None
@@ -88,7 +88,7 @@ def normalize(image, label):
 def show_a_record():
   filename = "data/validation.tfrecords"
   dataset = tf.data.TFRecordDataset(filename)
-  iterator = tf.contrib.data.Iterator(dataset)
+  iterator = tfe.Iterator(dataset)
   for i in iterator:
     print(i)
     decoded = decode(i)
