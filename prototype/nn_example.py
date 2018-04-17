@@ -1,7 +1,6 @@
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
-import tqdm
 import random
 
 sess = tf.InteractiveSession()
@@ -41,9 +40,10 @@ flat = tf.layers.flatten(pool2)
 
 # pass flattened input into the first fully connected layer
 fc1 = tf.layers.dense(inputs=flat, units=512, activation=tf.nn.relu)
-# define second fully connected layer for 0-9 digit classification
-'''TODO: define the second fully connected layer. Think about the number of units you need.'''
-y_pred = tf.layers.dense(inputs=fc1, units=10) 
+
+fc2 = tf.layers.dense(inputs=fc1, units=256, activation=tf.nn.relu)
+
+y_pred = tf.layers.dense(inputs=fc2, units=10)
 
 # output probabilities of input image belonging to each digit class
 '''TODO: compute output probabilities for the predicted labels. What activation function should you use?'''
@@ -52,7 +52,7 @@ probabilities = tf.nn.softmax(y_pred)
 # calculate mean cross entropy over entire batch of samples. 
 '''TODO: write a TensorFlow expression for computing the mean cross entropy loss over the entire batch of samples.
 Hint: consider tf.nn.softmax_cross_entropy_with_logits_v2 and pay close attention to the logits input!'''
-cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=y_pred))
+cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=y_pred))
 
 optimizer = tf.train.AdamOptimizer(1e-3).minimize(cross_entropy)
 correct_prediction = tf.equal(tf.argmax(y_pred, 1), tf.argmax(y, 1))
@@ -72,8 +72,9 @@ with tf.Session() as sess:
     uniq_id = "./logs/lab2part1_"+uuid.uuid1().__str__()[:6]
     summary_writer = tf.summary.FileWriter(uniq_id, graph=tf.get_default_graph())
     training_perf = []
-    for i in tqdm.tqdm(range(num_iterations)):
+    for i in range(num_iterations):
         batch = mnist.train.next_batch(50)
+        print i
 
         feed_dict = {x: batch[0], y: batch[1]}
         (_, train_accuracy, summary) = sess.run([optimizer,accuracy, merged_summary_op], feed_dict=feed_dict)
