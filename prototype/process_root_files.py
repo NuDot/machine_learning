@@ -1,8 +1,8 @@
 import argparse
 import math
 from random import *
-import matplotlib.pyplot as plt
 import numpy as np
+import time
 from ROOT import TFile
 
 
@@ -61,14 +61,12 @@ def rotated(feature_map, theta, phi):
 
 
 def transcribe_hits(tree, theta, phi):
-  first_dimension = int((FINAL_TIME - INITIAL_TIME) / TIME_STEP) + 1
-  second_dimension = MAX_PRESSURE + 1
-  feature_map_collections = np.zeros((((first_dimension,second_dimension,ROWS,COLS))))
-  counter = 0
-  for event in tree:
-    counter += 1
-    if counter > 1:
-      break
+  n_evts = tree.GetEntries()
+  n_time_cuts = int((FINAL_TIME - INITIAL_TIME) / TIME_STEP) + 1
+  n_qe_values = MAX_PRESSURE + 1
+  feature_map_collections = np.zeros((((n_evts, n_time_cuts,n_qe_values,ROWS,COLS))))
+  for evt_index in range(n_evts):
+    tree.GetEntry(evt_index)
 
     for i in range(tree.N_phot):
       row, col = xyz_to_row_col(tree.x_hit[i], tree.y_hit[i], tree.z_hit[i])
@@ -77,16 +75,16 @@ def transcribe_hits(tree, theta, phi):
           time_index = int((pressure_time - 32) / 0.5)
           for pressure_pe in range (0, 11):
             if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
-              feature_map_collections[time_index][pressure_pe][row][col] += 100
+              feature_map_collections[evt_index][time_index][pressure_pe][row][col] += 100
 
-    for index_f, first_layer in enumerate(feature_map_collections):
+    for index_f, first_layer in enumerate(feature_map_collections[evt_index]):
       for index_s, target_map in enumerate(first_layer):
         target_map = rotated(target_map, theta=theta, phi=phi)
-        feature_map_collections[index_f][index_s] = target_map
+        feature_map_collections[evt_index][index_f][index_s] = target_map
 
 
-  plt.imshow(feature_map_collections[2][0])
-  plt.show()
+  np.save("feature_map_collections_%d.npy" % time.time(),
+      feature_map_collections)
 
 
 
