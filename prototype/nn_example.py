@@ -40,9 +40,10 @@ flat = tf.layers.flatten(pool2)
 
 # pass flattened input into the first fully connected layer
 fc1 = tf.layers.dense(inputs=flat, units=512, activation=tf.nn.relu)
-# define second fully connected layer for 0-9 digit classification
-'''TODO: define the second fully connected layer. Think about the number of units you need.'''
-y_pred = tf.layers.dense(inputs=fc1, units=10) 
+
+fc2 = tf.layers.dense(inputs=fc1, units=256, activation=tf.nn.relu)
+
+y_pred = tf.layers.dense(inputs=fc2, units=10)
 
 # output probabilities of input image belonging to each digit class
 '''TODO: compute output probabilities for the predicted labels. What activation function should you use?'''
@@ -73,6 +74,7 @@ with tf.Session() as sess:
     training_perf = []
     for i in range(num_iterations):
         batch = mnist.train.next_batch(50)
+        print i
 
         feed_dict = {x: batch[0], y: batch[1]}
         (_, train_accuracy, summary) = sess.run([optimizer,accuracy, merged_summary_op], feed_dict=feed_dict)
