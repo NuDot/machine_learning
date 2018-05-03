@@ -1,4 +1,3 @@
-
 # coding: utf-8
 
 # ## ANN learning to distingush two kinds of photos
@@ -6,16 +5,11 @@
 # ## Code started from a quick classifier by Ilija Vukotic
 # ## ======================================================
 
-# In[1]:
-
-
-#get_ipython().magic('matplotlib inline')
 
 import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-#import pandas as pd
 from keras.models import Sequential
 
 from sklearn.model_selection import train_test_split
@@ -32,106 +26,64 @@ from keras.utils import to_categorical
 
 # #### load the data
 
-# In[2]:
+TIME_CUT_INDEX = 2
+QE_INDEX = 0
+
 
 
 # signal
 
-data = []
 
-for file in os.listdir("signal_allLight_33p5ns_Te130_center"):
-    if file.endswith(".npy"):
-        fn = os.path.join("signal_allLight_33p5ns_Te130_center", file)
-        data.append(np.load(fn))
-
-print ('files loaded:', len(data))
-signal_data = np.concatenate(tuple(data))
+filename = "/projectnb/snoplus/sphere_data/feature_map_collections.sph_out_Te130_15k.1525282884.npy"
+signal_data = np.load(filename)[TIME_CUT_INDEX][QE_INDEX]
+print signal_data
 
 print('signal (images, y, x): ', signal_data.shape)
 
 signal_images=signal_data.shape[0]
 
-ev = signal_data[10]
-input_shape=ev.shape
-print('image size:', input_shape)
-plt.imshow(ev)
-plt.colorbar()
-plt.show()
+for i in range(1):
+  #continue
+  ev = signal_data[i]
+  input_shape=ev.shape
+  print('image size:', input_shape)
+  plt.imshow(ev)
+  plt.colorbar()
+  plt.show()
 
-
-# In[3]:
 
 
 # background
 
-data = []
-dir_name='background_allLight_33p5ns_1el_2p529MeV_center_rndDir'
-for file in os.listdir(dir_name):
-    if file.endswith(".npy"):
-        fn = os.path.join(dir_name, file)
-        data.append(np.load(fn))
 
-print ('files loaded:', len(data))
-background_data = np.concatenate(tuple(data))
+filename = "/projectnb/snoplus/sphere_data/feature_map_collections.sph_out_1el_2p53_MeV_15k.1525282828.npy"
+background_data = np.load(filename)[TIME_CUT_INDEX][QE_INDEX]
 
 print('background (images, y, x): ', background_data.shape)
 
 background_images=background_data.shape[0]
 
-ev = background_data[10]
-input_shape=ev.shape
-print('image size:', input_shape)
-plt.imshow(ev)
-plt.colorbar()
-plt.show()
+for i in range(1):
+  #continue
+  ev = background_data[i]
+  input_shape=ev.shape
+  print('image size:', input_shape)
+  plt.imshow(ev)
+  plt.colorbar()
+  plt.show()
 
 
-# In[4]:
-
-
-# signal type 2
-
-#data = []
-#for file in os.listdir("signal_type2_simple"):
-#    if file.endswith(".npy"):
-#        fn = os.path.join("signal_type2_simple", file)
-#        data.append(np.load(fn))pe
-
-#print ('files loaded:', len(data))
-#signal_type2_data = np.concatenate(tuple(data))
-
-#print('signal type2 (images, y, x): ', signal_type2_data.shape)
-
-#signal_type2_images=signal_type2_data.shape[0]
-
-#ev = background_type2_data[1]
-#input_shape=ev.shape
-#print('image size:', input_shape)
-#plt.imshow(ev)
-#plt.colorbar()
-#plt.show()
-
-
-# ### create labels and rescale data
-
-# In[67]:
 
 
 labels = np.array([1] * signal_images + [0] * background_images)
 data=np.concatenate((signal_data, background_data))
 data = data/20.0
 print (data.shape)
-data = data.reshape(1, 20000, 10, 20)
-print (data.shape)
-data = data.swapaxes(0, 1)
-data = data.swapaxes(1, 2)
-data = data.swapaxes(2, 3)
-print (data.shape)
+print type(data.shape)
+data = data.reshape(data.shape+(1,))
 
 
 # ### split into training and test samples
-
-# In[68]:
 
 
 (trainX, testX, trainY, testY) = train_test_split(data, labels, test_size=0.25, random_state=42)
@@ -150,7 +102,7 @@ print('labels:', trainY.shape, testY.shape)
 
 def createModel():
     model = Sequential()
-    model.add(Conv2D(4, (3, 3), padding='same', input_shape=(10,20,1))) #h=10, w=20
+    model.add(Conv2D(4, (3, 3), padding='same', input_shape=(100,50,1))) #h=10, w=20
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2, 2),strides=(2,2))) #h = 5, w = 10
     
@@ -290,4 +242,3 @@ plt.scatter(roc_c[:,0],roc_c[:,1])
 #    roc_c[i][1] = n_sig/Ntot_sig
 #    roc_c[i][0] = n_bkg/Ntot_bkg
 #plt.hist2d(roc_c[:,0],roc_c[:,1])
-
