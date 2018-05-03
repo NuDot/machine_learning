@@ -1,5 +1,6 @@
 import argparse
 import math
+import os
 from random import *
 import numpy as np
 import time
@@ -7,11 +8,12 @@ from ROOT import TFile
 
 
 #Global Variables
+RUN_TIMESTAMP = time.time()
 INITIAL_TIME = 32
 FINAL_TIME = 38
-TIME_STEP =0.5
-MAX_PRESSURE=10
-N_PMTS=5000
+TIME_STEP = 0.5
+MAX_PRESSURE = 10
+N_PMTS = 5000
 COLS = int(math.sqrt(N_PMTS/2))
 ROWS = COLS *2
 
@@ -60,12 +62,15 @@ def rotated(feature_map, theta, phi):
   return feature_map
 
 
-def transcribe_hits(tree, theta, phi):
+def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt):
+  f1 = TFile(input)
+  tree = f1.Get("epgTree")
   n_evts = tree.GetEntries()
+  end_evt = min(n_evts, end_evt)
   n_time_cuts = int((FINAL_TIME - INITIAL_TIME) / TIME_STEP) + 1
   n_qe_values = MAX_PRESSURE + 1
-  feature_map_collections = np.zeros((((n_evts, n_time_cuts,n_qe_values,ROWS,COLS))))
-  for evt_index in range(n_evts):
+  feature_map_collections = np.zeros((((n_time_cuts, n_qe_values, n_evts, ROWS, COLS))))
+  for evt_index in range(start_evt, end_evt):
     tree.GetEntry(evt_index)
 
     for i in range(tree.N_phot):
@@ -75,33 +80,28 @@ def transcribe_hits(tree, theta, phi):
           time_index = int((pressure_time - 32) / 0.5)
           for pressure_pe in range (0, 11):
             if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
-              feature_map_collections[evt_index][time_index][pressure_pe][row][col] += 100
+              feature_map_collections[time_index][pressure_pe][evt_index][row][col] += 100
 
-    for index_f, first_layer in enumerate(feature_map_collections[evt_index]):
-      for index_s, target_map in enumerate(first_layer):
-        target_map = rotated(target_map, theta=theta, phi=phi)
-        feature_map_collections[evt_index][index_f][index_s] = target_map
-
-
-  np.save("feature_map_collections_%d.npy" % time.time(),
+  input_name = os.path.basename(input).split('.')[0]
+  np.save(os.path.join(outputdir, "feature_map_collections.%s.%d.%d.npy" % (input_name, start_evt, end_evt)),
       feature_map_collections)
+
 
 
 
 def main():
   parser = argparse.ArgumentParser()
-  parser.add_argument("--input", default="sph_out_topology180_center_NoMultScat_100.root")
+  parser.add_argument("--input", default="/projectnb/snoplus/sphere_data/sph_out_1el_2p53_MeV_15k.root")
+  parser.add_argument("--outputdir", default="/projectnb/snoplus/sphere_data")
   parser.add_argument("--type", "-t", help="Type of MC files, 1 ring or 2 ring", default = 1)
   parser.add_argument("--theta","-th", help="Rotate Camera with given theta(0 - 2pi)",type = float, default = 0)
   parser.add_argument("--phi","-ph", help="Rotate Camera with given phi(0 - pi)",type = float, default = 0)
+  parser.add_argument("--start", help="start event",type = int, default = 0)
+  parser.add_argument("--end", help="end event",type = int, default = 1000000000)
   args = parser.parse_args()
 
 
-  f1 = TFile(args.input)
-
-  tree = f1.Get("epgTree")
-
-  transcribe_hits(tree, theta=args.theta, phi=args.phi)
+  transcribe_hits(input=args.input, theta=args.theta, phi=args.phi, outputdir=args.outputdir, start_evt=args.start, end_evt=args.end)
 
 
 
