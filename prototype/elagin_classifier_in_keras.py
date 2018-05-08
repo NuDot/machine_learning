@@ -34,7 +34,7 @@ QE_INDEX = 0
 # signal
 
 
-filename = "/projectnb/snoplus/sphere_data/feature_map_collections.sph_out_Te130_15k.1525282884.npy"
+filename = "/projectnb/snoplus/sphere_data/npy/feature_map_collections.sph_out_Te130_15k_1702211533.6000.7000.npy"
 signal_data = np.load(filename)[TIME_CUT_INDEX][QE_INDEX]
 print signal_data
 
@@ -56,7 +56,7 @@ for i in range(1):
 # background
 
 
-filename = "/projectnb/snoplus/sphere_data/feature_map_collections.sph_out_1el_2p53_MeV_15k.1525282828.npy"
+filename = "/projectnb/snoplus/sphere_data/npy/feature_map_collections.sph_out_1el_2p53_MeV_15k.5000.6000.npy"
 background_data = np.load(filename)[TIME_CUT_INDEX][QE_INDEX]
 
 print('background (images, y, x): ', background_data.shape)
@@ -102,30 +102,32 @@ print('labels:', trainY.shape, testY.shape)
 
 def createModel():
     model = Sequential()
-    model.add(Conv2D(4, (3, 3), padding='same', input_shape=(100,50,1))) #h=10, w=20
+    model.add(Conv2D(32, (5, 5), padding='same', input_shape=(100,50,1))) #h=10, w=20
     model.add(Activation('relu'))
     model.add(MaxPooling2D(pool_size=(2, 2),strides=(2,2))) #h = 5, w = 10
     
-    model.add(Conv2D(8, (2, 3), activation='relu')) #h=5-2+1=4, w = 10-3+1=8
+    model.add(Conv2D(48, (4, 4), activation='relu')) #h=5-2+1=4, w = 10-3+1=8
     model.add(MaxPooling2D(pool_size=(2, 2), strides=(2,2))) #h=2, w=4
     
-    model.add(Conv2D(16, (2, 2), padding='same', activation='relu')) #h=2, w=4
+    model.add(Conv2D(64, (3, 3), padding='same', activation='relu')) #h=2, w=4
     model.add(MaxPooling2D(pool_size=(2, 2))) #h=1, w=2
     model.add(Dropout(0.25))
  #
- #   model.add(Conv2D(30, (3, 3), activation='relu'))
- #   model.add(MaxPooling2D(pool_size=(2, 2)))
- #   model.add(Dropout(0.25))
+    model.add(Conv2D(80, (2, 2), activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Dropout(0.25))
  
-#     model.add(Conv2D(64, (3, 3), padding='same', activation='relu'))
-#     model.add(Conv2D(64, (3, 3), activation='relu'))
-#     model.add(MaxPooling2D(pool_size=(2, 2)))
-#     model.add(Dropout(0.25))
+    # #model.add(Conv2D(96, (3, 3), padding='same', activation='relu'))
+    # model.add(Conv2D(64, (3, 3), activation='relu'))
+    # #model.add(MaxPooling2D(pool_size=(2, 2)))
+    # model.add(Dropout(0.25))
  
     model.add(Flatten())
-    model.add(Dense(64, activation='relu'))
+    model.add(Dense(80, activation='relu'))
     model.add(Dropout(0.25))
-    model.add(Dense(32, activation='relu'))
+    model.add(Dense(40, activation='relu'))
+    model.add(Dropout(0.25))
+    model.add(Dense(10, activation='relu'))
     model.add(Dropout(0.25))
     model.add(Dense(1, activation='sigmoid'))
      
@@ -141,7 +143,7 @@ my_network=createModel()
 # In[83]:
 
 
-batch_size = 64
+batch_size = 100
 epochs = 50
 my_network.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
  
@@ -181,6 +183,7 @@ print('\npredY.shape = ',predY.shape)
 print(predY[0:10])
 print(testY[0:10])
 auc = roc_auc_score(testY, predY)
+plt.show()
 print('\nauc:', auc)
 #fpr, tpr, thr =roc_curve(np.argmax(testY, axis=1), np.argmax(predY, axis=1))
 fpr, tpr, thr =roc_curve(testY, predY)
@@ -192,17 +195,12 @@ plt.show()
 print('False positive rate:',fpr[1], '\nTrue positive rate:',tpr[1])
 
 
-# In[15]:
-
 
 my_network.summary()
 
 
-# In[147]:
-
-
 print(testY.shape)
-testY = testY.reshape(5000,1)
+testY = testY.reshape(500,1)
 print(predY.shape)
 print(testY.T)
 A = np.hstack((testY, predY))

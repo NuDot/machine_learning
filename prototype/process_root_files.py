@@ -69,8 +69,9 @@ def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt):
   end_evt = min(n_evts, end_evt)
   n_time_cuts = int((FINAL_TIME - INITIAL_TIME) / TIME_STEP) + 1
   n_qe_values = MAX_PRESSURE + 1
-  feature_map_collections = np.zeros((((n_time_cuts, n_qe_values, n_evts, ROWS, COLS))))
+  feature_map_collections = np.zeros((((n_time_cuts, n_qe_values, (end_evt-start_evt), ROWS, COLS))))
   for evt_index in range(start_evt, end_evt):
+    #print evt_index
     tree.GetEntry(evt_index)
 
     for i in range(tree.N_phot):
@@ -80,9 +81,10 @@ def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt):
           time_index = int((pressure_time - 32) / 0.5)
           for pressure_pe in range (0, 11):
             if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
-              feature_map_collections[time_index][pressure_pe][evt_index][row][col] += 100
+              feature_map_collections[time_index][pressure_pe][evt_index - start_evt][row][col] += 1
 
   input_name = os.path.basename(input).split('.')[0]
+  #print feature_map_collections.shape
   np.save(os.path.join(outputdir, "feature_map_collections.%s.%d.%d.npy" % (input_name, start_evt, end_evt)),
       feature_map_collections)
 
