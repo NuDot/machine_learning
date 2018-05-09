@@ -136,8 +136,8 @@ def main():
   background_images = np.concatenate([load_data(filename.strip(), args.time_index, args.qe_index) for filename in list(open(args.bglist, 'r'))])
   data, labels = label_data(signal_images, background_images)
 
-  save_prefix = os.path.join(args.outdir, "%s_%s_%d_" % (
-      args.signal, args.bg, time.time()))
+  save_prefix = os.path.join(args.outdir, "%s_%s_qe%d_time%d_%d_" % (
+      args.signal, args.bg, args.qe_index, args.time_index, time.time()))
   print save_prefix
 
   train(data, labels, save_prefix)
