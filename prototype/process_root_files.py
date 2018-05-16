@@ -62,7 +62,7 @@ def rotated(feature_map, theta, phi):
   return feature_map
 
 
-def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt):
+def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi):
   f1 = TFile(input)
   tree = f1.Get("epgTree")
   n_evts = tree.GetEntries()
@@ -73,15 +73,15 @@ def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt):
   for evt_index in range(start_evt, end_evt):
     #print evt_index
     tree.GetEntry(evt_index)
-
-    for i in range(tree.N_phot):
-      row, col = xyz_to_row_col(tree.x_hit[i], tree.y_hit[i], tree.z_hit[i])
-      for pressure_time in drange2(INITIAL_TIME, FINAL_TIME, TIME_STEP):
-        if (tree.PE_time[i] >= INITIAL_TIME) and (tree.PE_time[i]  <= pressure_time):
-          time_index = int((pressure_time - 32) / 0.5)
-          for pressure_pe in range (0, 11):
-            if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
-              feature_map_collections[time_index][pressure_pe][evt_index - start_evt][row][col] += 1
+    if (tree.edep >= elow) and (tree.edep <= ehi):
+      for i in range(tree.N_phot):
+        row, col = xyz_to_row_col(tree.x_hit[i], tree.y_hit[i], tree.z_hit[i])
+        for pressure_time in drange2(INITIAL_TIME, FINAL_TIME, TIME_STEP):
+          if (tree.PE_time[i] >= INITIAL_TIME) and (tree.PE_time[i]  <= pressure_time):
+            time_index = int((pressure_time - 32) / 0.5)
+            for pressure_pe in range (0, 11):
+              if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
+                feature_map_collections[time_index][pressure_pe][evt_index - start_evt][row][col] += 1
 
   input_name = os.path.basename(input).split('.')[0]
   #print feature_map_collections.shape
@@ -100,10 +100,12 @@ def main():
   parser.add_argument("--phi","-ph", help="Rotate Camera with given phi(0 - pi)",type = float, default = 0)
   parser.add_argument("--start", help="start event",type = int, default = 0)
   parser.add_argument("--end", help="end event",type = int, default = 1000000000)
+  parser.add_argument("--elow", help="lower energy cut",type = float, default = 0.0)
+  parser.add_argument("--ehi", help="upper energy cut",type = float, default = 10000000.0)
   args = parser.parse_args()
 
 
-  transcribe_hits(input=args.input, theta=args.theta, phi=args.phi, outputdir=args.outputdir, start_evt=args.start, end_evt=args.end)
+  transcribe_hits(input=args.input, theta=args.theta, phi=args.phi, outputdir=args.outputdir, start_evt=args.start, end_evt=args.end, elow=args.elow, ehi=args.ehi)
 
 
 

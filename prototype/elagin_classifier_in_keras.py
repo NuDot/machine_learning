@@ -14,6 +14,8 @@ import time
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) 
 sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', 0) 
 
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from keras.models import Sequential
@@ -31,7 +33,7 @@ from keras.utils import to_categorical
 
 
 def load_data(npy_filename, time_cut_index, qe_index):
-  return np.load(npy_filename)[time_cut_index][qe_index]
+  return np.load(npy_filename, mmap_mode='r')[time_cut_index][qe_index]
 
 
 def label_data(signal_images, background_images):
@@ -44,14 +46,17 @@ def label_data(signal_images, background_images):
 
 def createModel():
   model = Sequential()
-  model.add(Conv2D(4, (3, 3), padding='same', input_shape=(100,50,1))) #h=100, w=200
+  model.add(Conv2D(32, (5, 5), padding='same', input_shape=(100,50,1))) #h=100, w=200
   model.add(Activation('relu'))
   model.add(MaxPooling2D(pool_size=(2, 2),strides=(2,2))) #h = 5, w = 10
   
-  model.add(Conv2D(8, (2, 3), activation='relu')) #h=5-2+1=4, w = 10-3+1=8
+  model.add(Conv2D(48, (4, 4), activation='relu')) #h=5-2+1=4, w = 10-3+1=8
   model.add(MaxPooling2D(pool_size=(2, 2), strides=(2,2))) #h=2, w=4
   
-  model.add(Conv2D(16, (2, 2), padding='same', activation='relu')) #h=2, w=4
+  model.add(Conv2D(64, (3, 3), padding='same', activation='relu')) #h=2, w=4
+  model.add(MaxPooling2D(pool_size=(2, 2))) #h=1, w=2
+
+  model.add(Conv2D(80, (2, 2), padding='same', activation='relu')) #h=2, w=4
   model.add(MaxPooling2D(pool_size=(2, 2))) #h=1, w=2
   model.add(Dropout(0.25))
 
@@ -75,7 +80,7 @@ def train(data, labels, save_prefix=''):
   my_network.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
   history = my_network.fit(trainX, trainY, batch_size=batch_size, epochs=epochs, verbose=1, validation_data=(testX, testY))
   my_network.save(save_prefix + 'model.h5')
-  print my_network.evaluate(testX, testY)
+  np.save(save_prefix+'evaluate.npy', my_network.evaluate(testX, testY))
   plot_loss(history, save_prefix)
   plot_accuracy(history, save_prefix)
   plot_roc(my_network, testX, testY, save_prefix)
