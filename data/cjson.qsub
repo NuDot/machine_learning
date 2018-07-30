@@ -1,0 +1,14 @@
+#!/bin/bash -l
+
+module load python
+
+#$ -P snoplus
+
+#$ -l mem_per_core=8G
+
+#$ -l h_rt=48:00:00
+
+#$ -j y
+
+
+python /projectnb/snoplus/machine_learning/data/convert_json.py

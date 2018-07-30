@@ -6,6 +6,7 @@ from matplotlib.colors import LogNorm
 import numpy as np
 from sklearn.svm import SVC
 
+from tools import load_data, label_data, ceate_table_dense
 
 N_TIMES = 13
 N_QES = 10

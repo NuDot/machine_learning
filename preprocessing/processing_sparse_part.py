@@ -7,6 +7,7 @@ from random import *
 import numpy as np
 import time
 from ROOT import TFile
+from datetime import datetime
 
 #Global Variables
 PMT_POSITION = []
@@ -18,6 +19,7 @@ N_PMTS = len(PMT_POSITION)
 COLS = int(math.sqrt(N_PMTS/2))
 ROWS = COLS *2
 RUN_TIMESTAMP = time.time()
+MIN_PRESSURE = 9
 MAX_PRESSURE = 10
 FIRST_PHOTON = False
 
@@ -43,6 +45,20 @@ def xyz_to_phi_theta(x, y, z):
    theta = math.acos(z / r)
    return phi, theta
 
+class cd:
+   '''
+   Context manager for changing the current working directory
+   '''
+   def __init__(self, newPath):
+      self.newPath = newPath
+
+   def __enter__(self):
+      self.savedPath = os.getcwd()
+      os.chdir(self.newPath)
+
+   def __exit__(self, etype, value, traceback):
+      os.chdir(self.savedPath)
+
 
 def phi_theta_to_row_col(phi, theta, rows=ROWS, cols=COLS):
    # phi is in [-pi, pi], theta is in [0, pi]
@@ -52,18 +68,18 @@ def phi_theta_to_row_col(phi, theta, rows=ROWS, cols=COLS):
    col = max(col, 0)
    return int(row), int(col)
 
-def pmt_allocator(x,y,z, photocoverage):
+def pmt_setup(vec1):
+    pmt_index = np.array([calculate_angle(vec1, vec2) for vec2 in PMT_POSITION]).argmin()
+    x2,y2,z2 = PMT_POSITION[pmt_index]
+    detector_radius = (x2**2 + y2**2 + z2**2)**0.5
+    pmt_angle = calculate_angle(vec1, PMT_POSITION[pmt_index])
+    return pmt_index, detector_radius, pmt_angle
 
-   vec1 = [x,y,z]
-   pmt_index = np.array([calculate_angle(vec1, vec2) for vec2 in PMT_POSITION]).argmin()
-   x2,y2,z2 = PMT_POSITION[pmt_index]
-   detector_radius = (x2**2 + y2**2 + z2**2)**0.5
+def pmt_allocator(pmt_angle, detector_radius, photocoverage):
    single_coverage = 4 * math.pi * detector_radius**2 * photocoverage / float(N_PMTS)
    coverage_radius = (single_coverage / float(math.pi))**0.5
    coverage_angle = math.tan(coverage_radius/float(detector_radius))
-   if ((calculate_angle(vec1, PMT_POSITION[pmt_index])) > coverage_angle):
-    pmt_index = -1
-   return pmt_index
+   return (pmt_angle <= coverage_angle)
 
 
 def calculate_angle(vec1, vec2):
@@ -73,8 +89,6 @@ def calculate_angle(vec1, vec2):
   len1 = (x1**2 + y1**2 + z1**2)**0.5
   len2 = (x2**2 + y2**2 + z2**2)**0.5
   return math.acos(float(inner_product)/float(len1*len2))
-
-
 
 
 def xyz_to_row_col(x, y, z, rows=ROWS, cols=COLS):
@@ -111,6 +125,12 @@ def set_clock(tree, evt):
     time_array.append(tree.PE_time[i])
   return clock(np.array(time_array).min())
 
+def savefile(saved_file, appendix, filename, pathname):
+    if not os.path.exists(pathname):
+     os.mkdir(pathname)
+    with cd(pathname):
+        with open(filename, 'w') as datafile:
+          json.dump(saved_file, datafile)
 
 
 def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi):
@@ -122,7 +142,7 @@ def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi)
   n_qe_values = MAX_PRESSURE + 1
   photocoverage_scale = list(np.linspace(1.0,0.2,9))
   shrink_list = []
-  feature_map_collections = np.zeros(((((len(photocoverage_scale), n_qe_values, (end_evt-start_evt), current_clock.clock_size(), ROWS, COLS)))))
+  feature_map_collections = np.zeros(((((len(photocoverage_scale), (n_qe_values - MIN_PRESSURE), (end_evt-start_evt), current_clock.clock_size(), ROWS, COLS)))))
   for evt_index in range(start_evt, end_evt):
     tree.GetEntry(evt_index)
     if (tree.edep < elow) or (tree.edep > ehi):
@@ -130,84 +150,49 @@ def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi)
       continue
     current_clock = set_clock(tree, evt_index)
     for i in range(tree.N_phot):
+    #for i in range(10):
+      ###############################################
+      pmt_index, detector_radius, pmt_angle = pmt_setup([tree.x_hit[i],tree.y_hit[i],tree.z_hit[i]])
+      ###############################################
       for pressure_pc in photocoverage_scale:
-        pmt_index = pmt_allocator(tree.x_hit[i],tree.y_hit[i],tree.z_hit[i], pressure_pc)
-        if (pmt_index == -1):
-          continue
-        row, col = xyz_to_row_col(PMT_POSITION[pmt_index][0], PMT_POSITION[pmt_index][1], PMT_POSITION[pmt_index][2])
-        for pressure_pe in range (0, n_qe_values):
-          if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
-            time_index = current_clock.tick(tree.PE_time[i])
-            feature_map_collections[photocoverage_scale.index(pressure_pc)][pressure_pe][evt_index - start_evt][time_index][row][col] += 1.0
+        if (pmt_allocator(pmt_angle, detector_radius, pressure_pc)):
+          row, col = xyz_to_row_col(PMT_POSITION[pmt_index][0], PMT_POSITION[pmt_index][1], PMT_POSITION[pmt_index][2])
+          for pressure_pe in range (MIN_PRESSURE, n_qe_values):
+            if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
+              time_index = current_clock.tick(tree.PE_time[i])
+              feature_map_collections[photocoverage_scale.index(pressure_pc)][pressure_pe - MIN_PRESSURE][evt_index - start_evt][time_index][row][col] += 1.0
   feature_map_collections = np.delete(feature_map_collections, shrink_list ,2)
-  for qcindex, qc in enumerate(feature_map_collections):
-    for qeindex, qe in enumerate(qc):
-      feature_map_collections[qcindex][qeindex] = np.divide(qe, (1.2 * qe.max()))
-  
-  print feature_map_collections.shape
+  dim1, dim2, dim3, dim4, dim5, dim6 = feature_map_collections.shape
+  lst = np.zeros((dim3,dim4,1))
   input_name = os.path.basename(input).split('.')[0]
-  np.save(os.path.join(outputdir, "feature_map_collections.%s.%d.%d.npy" % (input_name, start_evt, end_evt)),
-      feature_map_collections)
+  data_path = os.path.join(outputdir, "data_%s.%d.%d" % (input_name, start_evt, end_evt))
+  indices_path = os.path.join(outputdir, "indices_%s.%d.%d" % (input_name, start_evt, end_evt))
+  indptr_path = os.path.join(outputdir, "indptr_%s.%d.%d" % (input_name, start_evt, end_evt))
+  data = lst.tolist()
+  indices = lst.tolist()
+  indptr = lst.tolist()
+  for qcindex, qc in enumerate(feature_map_collections):
+    for qeindex, qe in enumerate(qc): 
+      currentEntry = qe
+      if (qe.max() != 0):
+        currentEntry = np.divide(qe, (1.2 * qe.max()))
+      for evt_index, evt in enumerate(currentEntry):
+        for time_index, maps in enumerate(evt):
+          sparse_map = sparse.csr_matrix(maps)
+          data[evt_index][time_index] = map(float, sparse_map.data)
+          indices[evt_index][time_index] = map(int, sparse_map.indices)
+          indptr[evt_index][time_index] = map(int, sparse_map.indptr)
+      qcqename = str(qcindex) + '_' + str(qeindex + MIN_PRESSURE) + '.json'
+      savefile(data, 'data', qcqename, data_path)
+      savefile(indices, 'indices', qcqename, indices_path)
+      savefile(indptr, 'indptr', qcqename, indptr_path)
   return feature_map_collections
-
-# def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi):
-#   current_clock = clock(0)
-#   f1 = TFile(input)
-#   tree = f1.Get("epgTree")
-#   n_evts = tree.GetEntries()
-#   end_evt = min(n_evts, end_evt)
-#   n_qe_values = MAX_PRESSURE + 1
-#   photocoverage_scale = list(np.linspace(1.0,0.2,9))
-#   shrink_list = []
-#   feature_map_collections = np.zeros(((((len(photocoverage_scale), n_qe_values, (end_evt-start_evt), current_clock.clock_size(), ROWS, COLS)))))
-#   for evt_index in range(start_evt, end_evt):
-#     tree.GetEntry(evt_index)
-#     if (tree.edep < elow) or (tree.edep > ehi):
-#       shrink_list.append(evt_index)
-#       continue
-#     current_clock = set_clock(tree, evt_index)
-#     #for i in range(tree.N_phot):
-#     for i in range(10): 
-#       for pressure_pc in photocoverage_scale:
-#         pmt_index = pmt_allocator(tree.x_hit[i],tree.y_hit[i],tree.z_hit[i], pressure_pc)
-#         if (pmt_index == -1):
-#           continue
-#         row, col = xyz_to_row_col(PMT_POSITION[pmt_index][0], PMT_POSITION[pmt_index][1], PMT_POSITION[pmt_index][2])
-#         for pressure_pe in range (0, n_qe_values):
-#           if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
-#             time_index = current_clock.tick(tree.PE_time[i])
-#             feature_map_collections[photocoverage_scale.index(pressure_pc)][pressure_pe][evt_index - start_evt][time_index][row][col] += 1.0
-#   feature_map_collections = np.delete(feature_map_collections, shrink_list ,2)
-#   #print feature_map_collections.shape
-#   dim1, dim2, dim3, dim4, dim5, dim6 = feature_map_collections.shape
-#   lst = [[[[[] for i4 in range(dim4)] for i3 in range(dim3)] for i2 in range(dim2)] for i1 in range(dim1)]
-#   #print lst
-#   data = lst
-#   indices = lst
-#   indptr = lst
-#   for qcindex, qc in enumerate(feature_map_collections):
-#     for qeindex, qe in enumerate(qc): 
-#       currentEntry = qe
-#       if (qe.max() != 0):
-#         currentEntry = np.divide(qe, (1.2 * qe.max()))
-#       for evt_index, evt in enumerate(currentEntry):
-#         for time_index, maps in enumerate(evt):
-#           sparse_map = sparse.csr_matrix(maps)
-#           print sparse_map.data
-#           data[qcindex][qeindex][evt_index][time_index] = list(sparse_map.data)
-#           indices[qcindex][qeindex][evt_index][time_index] = list(sparse_map.indices)
-#           indices[qcindex][qeindex][evt_index][time_index] = list(sparse_map.indptr)
-#   print indices[0][0][0]
-#   input_name = os.path.basename(input).split('.')[0]
-#   np.save(os.path.join(outputdir, "feature_map_collections.%s.%d.%d.npy" % (input_name, start_evt, end_evt)),
-#       feature_map_collections)
-#   return feature_map_collections
 
 
 
 
 def main():
-  #python /projectnb/snoplus/machine_learning/prototype/process_root_files.py --input /projectnb/snoplus/sphere_data/andrey_data/sph_out_1el_2p529MeV_center_rndDir_1k_20.root --outputdir /projectnb/snoplus/sphere_data/c10_2MeV/ --start 0 --end 1
+  #python /projectnb/snoplus/machine_learning/prototype/processing_sparse.py --input /projectnb/snoplus/sphere_data/input/sph_out_C10_dVrndVtx_3p0mSphere_1k_16.root --outputdir /projectnb/snoplus/sphere_data/c10_2MeV/ --start 2 --end 3
   parser = argparse.ArgumentParser()
   parser.add_argument("--input", default="/projectnb/snoplus/sphere_data/sph_out_1el_2p53_MeV_15k.root")
   parser.add_argument("--outputdir", default="/projectnb/snoplus/sphere_data")
@@ -222,6 +207,7 @@ def main():
 
 
   fmc = transcribe_hits(input=args.input, theta=args.theta, phi=args.phi, outputdir=args.outputdir, start_evt=args.start, end_evt=args.end, elow=args.elow, ehi=args.ehi)
+
 
 
 
