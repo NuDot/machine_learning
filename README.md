@@ -18,4 +18,3 @@ Analyzer: data analysis tool for making the pressure map and roc curves.
 
 data: Data processing script to be use on BU SCC cluster.
 
-
