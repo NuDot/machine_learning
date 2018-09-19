@@ -1,3 +1,13 @@
+###########################
+# Author: Aobo Li
+############################
+# History:
+# Sep.19, 2018 - First Version
+#################################
+# Purpose:
+# This code varies the photocoverage of given detector by expanding the 
+# radius of the PMT until they start to overlap.
+#############################################################
 import argparse
 import math
 import os
@@ -127,6 +137,7 @@ def savefile(saved_file, appendix, filename, pathname):
       with open(filename, 'w') as datafile:
         json.dump(saved_file, datafile)
 
+# sample points randomly on the rim of the given PMT
 def sample_pmt_rim(pmt_position, radii):
   x,y,z = pmt_position
   sphere_rad = float((x**2 + y**2 + z**2)**0.5)
