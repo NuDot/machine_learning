@@ -1,3 +1,13 @@
+###########################
+# Author: Aobo Li
+############################
+# History:
+# Sep.19, 2018 - First Version
+#################################
+# Purpose:
+# This code is used to convert MC simulated .root file into a 2D grid,
+# then it saves the code as a CSR sparse matrix.
+#############################################################
 import argparse
 import math
 import os
@@ -24,6 +34,7 @@ MAX_PRESSURE = 20
 QE_FACTOR = 1.0
 FIRST_PHOTON = False
 
+#Clock class: dealing with the input time of the photon hit.
 class clock:
   tick_interval = 1.5
   final_time = 45
@@ -48,6 +59,7 @@ def xyz_to_phi_theta(x, y, z):
    theta = math.acos(z / r)
    return phi, theta
 
+#change directory
 class cd:
    '''
    Context manager for changing the current working directory
@@ -63,6 +75,7 @@ class cd:
       os.chdir(self.savedPath)
 
 
+# Convert the phi theta information to row and column index in 2D grid
 def phi_theta_to_row_col(phi, theta, rows=ROWS, cols=COLS):
    # phi is in [-pi, pi], theta is in [0, pi]
    row = min(rows/2 + (math.floor((rows/2)*phi/math.pi)), rows-1)
@@ -71,6 +84,7 @@ def phi_theta_to_row_col(phi, theta, rows=ROWS, cols=COLS):
    col = max(col, 0)
    return int(row), int(col)
 
+# Set up the current photon hit position with the PMT closest to it
 def pmt_setup(vec1):
     pmt_index = np.array([calculate_angle(vec1, vec2) for vec2 in PMT_POSITION]).argmin()
     x2,y2,z2 = PMT_POSITION[pmt_index]
@@ -78,11 +92,13 @@ def pmt_setup(vec1):
     pmt_angle = calculate_angle(vec1, PMT_POSITION[pmt_index])
     return pmt_index, detector_radius, pmt_angle
 
+#Attempting to allocate the photon to the PMT, return whether the photon hit falls in 
+#the grey disk range of the setup pmt
 def pmt_allocator(pmt_angle, detector_radius, pmt_radius):
    coverage_angle = math.asin(pmt_radius/float(detector_radius))
    return (pmt_angle <= coverage_angle)
 
-
+# Calculating the angle between two input vectors
 def calculate_angle(vec1, vec2):
   x1,y1,z1 = vec1
   x2,y2,z2 = vec2
@@ -91,15 +107,11 @@ def calculate_angle(vec1, vec2):
   len2 = (x2**2 + y2**2 + z2**2)**0.5
   return math.acos(float(inner_product)/float(len1*len2))
 
-
+# Converting Cartesian position to 2D Grid
 def xyz_to_row_col(x, y, z, rows=ROWS, cols=COLS):
    return phi_theta_to_row_col(*xyz_to_phi_theta(x, y, z), rows=rows, cols=cols)
 
-def drange2(start, stop, step):
-    numelements = int((stop-start)/float(step))
-    for i in range(numelements+1):
-            yield start + i*step
-
+# Making a random decision based on the input pressure, used to vary quantum efficiency.
 def random_decision(pressure):
     decision = False
     if (pressure > MAX_PRESSURE) or (pressure == 0):
@@ -107,7 +119,7 @@ def random_decision(pressure):
     frac_pressure = float(pressure)/float(MAX_PRESSURE)
     return (random()<=(frac_pressure * QE_FACTOR))
 
-
+# Rotate the input image(renewal needed)
 def rotated(feature_map, theta, phi):
   row_rotation = int(math.fmod(theta, (2 * math.pi)) / (2 * math.pi) * ROWS)
   col_rotation = int(math.fmod(phi, math.pi) / math.pi * COLS)
@@ -119,6 +131,7 @@ def rotated(feature_map, theta, phi):
     feature_map = np.concatenate((right, left), axis = 1)
   return feature_map
 
+# Set up the clocl to start ticking on the first incoming photon of a given events.
 def set_clock(tree, evt):
   tree.GetEntry(evt)
   time_array = []
@@ -126,6 +139,7 @@ def set_clock(tree, evt):
     time_array.append(tree.PE_time[i])
   return clock(np.array(time_array).min())
 
+# Save input file as a .json file.
 def savefile(saved_file, appendix, filename, pathname):
     if not os.path.exists(pathname):
      os.mkdir(pathname)
@@ -133,10 +147,11 @@ def savefile(saved_file, appendix, filename, pathname):
         with open(filename, 'w') as datafile:
           json.dump(saved_file, datafile)
 
+# Smear the input photon time as a gaussian with given TTS, for KamLAND it's 1.0s
 def smearing_time(time):
   return np.random.normal(loc=time, scale=1.0)
 
-
+# Transcribe hits to a 6D pressure maps.
 def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi):
   current_clock = clock(0)
   f1 = TFile(input)
@@ -145,7 +160,8 @@ def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi)
   end_evt = min(n_evts, end_evt)
   n_qe_values = MAX_PRESSURE + 1
   photocoverage_scale = list(np.linspace(0.2159, 0.3173, 9))
-  shrink_list = []
+  shrink_list = [] # Shrink event out of the dataset that failed the energy cut
+  # feature map = [Photocoverage Pressure, QE Pressure, event, clock tick, theta, phi]
   feature_map_collections = np.zeros(((((len(photocoverage_scale), n_qe_values, (end_evt-start_evt), current_clock.clock_size(), ROWS, COLS)))))
   for evt_index in tqdm(range(start_evt, end_evt)):
     tree.GetEntry(evt_index)
@@ -162,10 +178,11 @@ def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi)
         if (pmt_allocator(pmt_angle, detector_radius, pressure_pc)):
           row, col = xyz_to_row_col(PMT_POSITION[pmt_index][0], PMT_POSITION[pmt_index][1], PMT_POSITION[pmt_index][2])
           for pressure_pe in range (0, n_qe_values):
+            # tree.PE_creation[i] == true means the photon passes the intrinsic MC QE mechanism, therefore it should always be accepted.
             if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
               time_index = current_clock.tick(smearing_time(tree.true_time[i]))
               feature_map_collections[photocoverage_scale.index(pressure_pc)][pressure_pe][evt_index - start_evt][time_index][row][col] += 1.0
-  feature_map_collections = np.delete(feature_map_collections, shrink_list ,2)
+  feature_map_collections = np.delete(feature_map_collections, shrink_list ,2)# Clear empty event that failed energy cut
   dim1, dim2, dim3, dim4, dim5, dim6 = feature_map_collections.shape
   lst = np.zeros((dim3,dim4,1))
   input_name = os.path.basename(input).split('.')[0]
@@ -175,6 +192,7 @@ def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi)
   data = lst.tolist()
   indices = lst.tolist()
   indptr = lst.tolist()
+  # Converting the feature map to a sparse matrix, this both save harddisk spaces and save memory for training.
   for qcindex, qc in enumerate(feature_map_collections):
     for qeindex, qe in enumerate(qc): 
       currentEntry = qe

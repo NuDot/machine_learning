@@ -1,3 +1,14 @@
+###########################
+# Author: Aobo Li
+############################
+# History:
+# Sep.19, 2018 - First Version
+#################################
+# Purpose:
+# This code evaluate the photocoverage of the detector by randomly sampling
+# a large amount of points on the surface of the detector, then calculate
+# the percentage of points being detected by the PMTs.
+#############################################################
 import argparse
 import math
 import os
