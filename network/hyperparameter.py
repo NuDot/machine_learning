@@ -1,3 +1,16 @@
+#############################################################################
+# Author: Aobo Li
+#############################################################################
+# History:
+# Sep.19, 2018 - First Version
+#############################################################################
+# Purpose:
+# Hyperparameter searching script based on Hyperopt and Hyperas. The hyperparameter
+# being searched in this script includes:
+# * Dropout Rate
+# * Number of fully connected layers
+# * Number of neurons in each layer
+#############################################################################
 from __future__ import print_function
 
 #import tool
@@ -34,43 +47,43 @@ from hyperas.distributions import choice, uniform
 
 from tool import load_data, label_data, ceate_table_dense, step_decay_schedule
 
-DIM1 = 136
-DIM2 = 68
-DIM3 = 40
+# DIM1 = 136
+# DIM2 = 68
+# DIM3 = 40
 
 
-# DIM1 = 50
-# DIM2 = 25
-# DIM3 = 30
+DIM1 = 50
+DIM2 = 25
+DIM3 = 30
 def data():
-  # #python /projectnb/snoplus/machine_learning/prototype/hyperparameter.py --signallist /projectnb/snoplus/machine_learning/data/networktrain/Te130.dat --bglist /projectnb/snoplus/machine_learning/data/networktrain/C10.dat --signal Te130 --bg C10 --outdir /projectnb/snoplus/sphere_data/c10_training_output_edit/Te130C10time9_qe6 --time_index 9 --qe_index 6
-  # parser = argparse.ArgumentParser()
-  # parser.add_argument("--signallist", type = str, default = "Te130.dat")
-  # parser.add_argument("--bglist", type = str, default = "C10E.dat")
-  # parser.add_argument("--signal", type = str, default = "Te130")
-  # parser.add_argument("--bg", type = str, default = "C10")
-  # parser.add_argument("--outdir", type = str, default = "/projectnb/snoplus/sphere_data/training_output")
-  # parser.add_argument("--time_index", type = int, default = 3)
-  # parser.add_argument("--qe_index", type = int, default = 0)
+  #python /projectnb/snoplus/machine_learning/prototype/hyperparameter.py --signallist /projectnb/snoplus/machine_learning/data/networktrain/Te130.dat --bglist /projectnb/snoplus/machine_learning/data/networktrain/C10.dat --signal Te130 --bg C10 --outdir /projectnb/snoplus/sphere_data/c10_training_output_edit/Te130C10time9_qe6 --time_index 9 --qe_index 6
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--signallist", type = str, default = "Te130.dat")
+  parser.add_argument("--bglist", type = str, default = "C10E.dat")
+  parser.add_argument("--signal", type = str, default = "Te130")
+  parser.add_argument("--bg", type = str, default = "C10")
+  parser.add_argument("--outdir", type = str, default = "/projectnb/snoplus/sphere_data/training_output")
+  parser.add_argument("--time_index", type = int, default = 3)
+  parser.add_argument("--qe_index", type = int, default = 0)
 
-  # args = parser.parse_args()
+  args = parser.parse_args()
 
-  # json_name = str(args.time_index) + '_' + str((args.qe_index)) + '.json'
-  # signal_images = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.signallist, 'r')) if component in filename] for component in ['data_', 'indices_', 'indptr_']]
-  # #print "Reading Signal Complete"
-  # background_images = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.bglist, 'r')) if component in filename] for component in ['data_', 'indices_', 'indptr_']]
-  # #print "Reading Background Complete"
+  json_name = str(args.time_index) + '_' + str((args.qe_index)) + '.json'
+  signal_images = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.signallist, 'r')) if component in filename] for component in ['data_', 'indices_', 'indptr_']]
+  #print "Reading Signal Complete"
+  background_images = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.bglist, 'r')) if component in filename] for component in ['data_', 'indices_', 'indptr_']]
+  #print "Reading Background Complete"
 
-  # signal_images = ceate_table_dense(signal_images)
-  # #print "Signal Table Created"
-  # background_images = ceate_table_dense(background_images)
-  # #print "Background Table Created"
+  signal_images = ceate_table_dense(signal_images)
+  #print "Signal Table Created"
+  background_images = ceate_table_dense(background_images)
+  #print "Background Table Created"
 
-  # dimensions = min(signal_images.shape[0], background_images.shape[0])
-  # #dimensions = 10
+  dimensions = min(signal_images.shape[0], background_images.shape[0])
+  #dimensions = 10
 
-  # signal_images = signal_images[0:dimensions]
-  # background_images = background_images[0:dimensions]
+  signal_images = signal_images[0:dimensions]
+  background_images = background_images[0:dimensions]
 
   # print(signal_images.shape)
   # print(background_images.shape)
@@ -78,14 +91,9 @@ def data():
   # background_images = np.load('bkg.npy', mmap_mode='r')
   # print(signal_images.shape,background_images.shape)
 
-  # data, labels = label_data(signal_images, background_images)
+  data, labels = label_data(signal_images, background_images)
 
-  # trainX, testX, trainY, testY = train_test_split(data, labels, test_size=0.25, random_state=42)
-  trainX = np.load("trainx.npy", mmap_mode='r')
-  trainY = np.load("trainy.npy", mmap_mode='r')
-  testX = np.load("testx.npy", mmap_mode='r')
-  testY = np.load("testy.npy", mmap_mode='r')
-
+  trainX, testX, trainY, testY = train_test_split(data, labels, test_size=0.25, random_state=42)
 
   return trainX, testX, trainY, testY
 
@@ -125,6 +133,7 @@ def createModel(trainX, testX, trainY, testY):
   model.add(BatchNormalization())
   model.add(Dropout({{uniform(0, 1)}}))
 
+  # Searching for extra fully connected layers.
   extra_layer = {{choice(['three', 'four', 'five', 'six'])}}
 
   if not extra_layer == 'three':
@@ -161,76 +170,17 @@ def createModel(trainX, testX, trainY, testY):
   print('Validation Accuracy:', score)
   print('Validation Accuracy:', acc)
   print('Test accuracy:', effpurity)
+  # Searching for the model that maximize effpurity(Rejection rate at 90% signal acceptance)
   return {'loss': - effpurity, 'status': STATUS_OK, 'model': model}
-
-
-
-# def train(trainX, testX, trainY, testY):
-#   # ### split into training and test samples
-#   #trainX, testX, trainY, testY = train_test_split(data, labels, test_size=0.25, random_state=42)
-#   my_network = createModel()
-#   batch_size = 64
-#   epochs = 1
-#   my_network.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
-#   history = my_network.fit(trainX, trainY, batch_size=batch_size, epochs=epochs, verbose=1, validation_data=(testX, testY))
-#   score, acc = my_network.evaluate(testX, testY, verbose=0)
-#   print('Test accuracy:', acc)
-#   return {'loss': -acc, 'status': STATUS_OK, 'model': my_network}
-#   # my_network.save(save_prefix + 'model.h5')
-#   # np.save(save_prefix+'evaluate.npy', my_network.evaluate(testX, testY))
-#   # plot_loss(history, save_prefix)
-#   # plot_accuracy(history, save_prefix)
-#   # plot_roc(my_network, testX, testY, save_prefix)
-
-
-# def plot_loss(history, save_prefix=''):
-#   # Loss Curves
-#   plt.figure(figsize=[8,6])
-#   plt.plot(history.history['loss'],'r',linewidth=3.0)
-#   plt.plot(history.history['val_loss'],'b',linewidth=3.0)
-#   plt.legend(['Training loss', 'Validation Loss'],fontsize=18)
-#   plt.xlabel('Epochs ',fontsize=16)
-#   plt.ylabel('Loss',fontsize=16)
-#   plt.title('Loss Curves',fontsize=16)
-#   plt.savefig(save_prefix + "acc.png")
- 
-# def plot_accuracy(history, save_prefix=''):
-#   # Accuracy Curves
-#   plt.figure(figsize=[8,6])
-#   plt.plot(history.history['acc'],'r',linewidth=3.0)
-#   plt.plot(history.history['val_acc'],'b',linewidth=3.0)
-#   plt.legend(['Training Accuracy', 'Validation Accuracy'],fontsize=18)
-#   plt.xlabel('Epochs ',fontsize=16)
-#   plt.ylabel('Accuracy',fontsize=16)
-#   plt.title('Accuracy Curves',fontsize=16)
-#   plt.savefig(save_prefix + "acc.png")
-
-
-# def plot_roc(my_network, testX, testY, save_prefix):
-#   predY = my_network.predict_proba(testX)
-#   print('\npredY.shape = ',predY.shape)
-#   print(predY[0:10])
-#   print(testY[0:10])
-#   auc = roc_auc_score(testY, predY)
-#   print('\nauc:', auc)
-#   fpr, tpr, thr = roc_curve(testY, predY)
-#   plt.plot(fpr, tpr, label = 'auc = ' + str(auc) )
-#   plt.xlabel('False Positive Rate')
-#   plt.ylabel('True Positive Rate')
-#   plt.legend(loc="lower right")
-#   print('False positive rate:',fpr[1], '\nTrue positive rate:',tpr[1])
-#   plt.savefig(save_prefix + "roc.png")
-
 
 
 if __name__ == '__main__':
   best_run, best_model = optim.minimize(model=createModel,
                                         data=data,
                                         algo=tpe.suggest,
-                                        max_evals=50,
+                                        max_evals=50,#number of trials we want to try for random search
                                         trials=Trials())
-  testX = np.load("testx.npy")
-  testY = np.load("testy.npy")
+  trainX, testX, trainY, testY = data()
   print("Evalutation of best performing model:")
   print(best_model.evaluate(testX, testY))
   print("Best performing model chosen hyper-parameters:")

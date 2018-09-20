@@ -1,3 +1,14 @@
+#############################################################################
+# Author: Aobo Li
+#############################################################################
+# History:
+# Sep.19, 2018 - First Version
+#############################################################################
+# Purpose:
+# Convolutional Neural Network used to perform classification tasks, constructed
+# from "elagin_classificer_in_keras.py", the parameter in this network need to be 
+# tuned specifically by "hyperparameter.py" to achieve the best performance.
+#############################################################################
 import argparse
 import os
 import sys
@@ -28,10 +39,14 @@ from keras.utils import to_categorical
 from datetime import datetime
 from tool import load_data, label_data, ceate_table
 
-DIM1 = 50
-DIM2 = 25
-DIM3 = 34
+#Dimension of input data
+DIM1 = 50#ROWS
+DIM2 = 25#COLS
+DIM3 = 34#Time(channels)
 
+# Batch generater used to convert sparse matrix to full matrix,
+# generator does not consume a lot of memory, which allows us to
+# train network with large matrices.
 def batch_generator(X, y, batch_size):
     number_of_batches = X.shape[0]/batch_size
     counter=0
@@ -51,6 +66,7 @@ def batch_generator(X, y, batch_size):
             np.random.shuffle(shuffle_index)
             counter=0
 
+# Reconstruct image from sparse array
 def reconstruct_image(Xarray):
   startTime = datetime.now()
   output = np.ndarray((Xarray.shape[0], Xarray.shape[1], DIM1, DIM2))
@@ -59,7 +75,7 @@ def reconstruct_image(Xarray):
       output[evt_index][time_index] = time.todense()
   return output
 
-
+# CNN Model
 def createModel():
   model = Sequential()
   model.add(Conv2D(32, (4, 4), padding='same',data_format="channels_first", input_shape=(DIM3,DIM1,DIM2))) #h=100, w=200
@@ -141,10 +157,12 @@ def train(data, labels, save_prefix=''):
                     validation_data=batch_generator(testX, testY, batch_size), validation_steps = (testX.shape[0]/batch_size))
   my_network.save(save_prefix + 'model.h5')
   np.save(save_prefix+'evaluate.npy', my_network.evaluate(reconstruct_image(testX), testY))
+  #Plotting the ROC curve
   predY = my_network.predict_proba(reconstruct_image(testX))
   auc = roc_auc_score(testY, predY)
   np.save(save_prefix+'roc_param.npy', roc_curve(testY, predY))
   fpr, tpr, thr = roc_curve(testY, predY)
+  # Find the rejection at 90% accuracy.
   effindex = np.abs(tpr-0.9).argmin()
   effpurity = 1.-fpr[effindex]
   np.save(save_prefix+'roc_value.npy', np.array([effpurity]))
@@ -168,14 +186,19 @@ def main():
   #To take into account the mistaken time index and qe index representation
   #Time: Reversed, 8 lowest pressure and 0 highest pressure
   #QE: started at 10 and ended at 20
-  time_index = 8 - args.time_index
-  qe_index = 10 + args.qe_index
+  ########################################################
+  # time_index = 8 - args.time_index
+  # qe_index = 10 + args.qe_index
+  #########################################################
+  time_index = args.time_index
+  qe_index = args.qe_index
   json_name = str(time_index) + '_' + str(qe_index) + '.json'
   signal_images = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.signallist, 'r')) if component in filename] for component in ['data_', 'indices_', 'indptr_']]
   #print("Reading Signal Complete")
   background_images = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.bglist, 'r')) if component in filename] for component in ['data_', 'indices_', 'indptr_']]
   #print("Reading Background Complete")
 
+  #create objective numpy array with each entry as a sparse matrix.
   signal_images = ceate_table(signal_images)
   #print("Signal Table Created")
   background_images = ceate_table(background_images)
@@ -183,6 +206,7 @@ def main():
 
   dimensions = min(signal_images.shape[0], background_images.shape[0])
 
+  #Make sure signal_images and background images contains the same amount of events.
   signal_images = signal_images[0:dimensions]
   background_images = background_images[0:dimensions]
 
