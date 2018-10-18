@@ -119,7 +119,7 @@ def createModel():
   model.add(BatchNormalization())
   model.add(Activation('relu'))
   model.add(Dropout(0.5))
-  model.add(Dense(1, activation='sigmoid'))
+  model.add(Dense(3, activation='sigmoid'))
    
   return model
 
@@ -151,7 +151,7 @@ def train(data, labels, save_prefix=''):
   my_network = createModel()
   batch_size = 100
   epochs = 30
-  my_network.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
+  my_network.compile(optimizer='rmsprop', loss='cosine_proximity', metrics=['accuracy'])
   history = my_network.fit_generator(generator=batch_generator(trainX, trainY, batch_size),
                     epochs=epochs, steps_per_epoch=(trainX.shape[0]/batch_size), use_multiprocessing=True,
                     validation_data=batch_generator(testX, testY, batch_size), validation_steps = (testX.shape[0]/batch_size))

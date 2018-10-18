@@ -300,7 +300,7 @@ def main():
 
   print np.unique(np.nonzero(fmc_xe136[0][0][0])[0], return_index=True)
 
-  plot_slice = [5,6,10,20]
+  plot_slice = [5,6,10,15]
   ###################################################################
   fig = plt.figure(figsize=(22, 15))
   gs = gridspec.GridSpec(2, 6, width_ratios=[2, 3, 3, 3, 3, 1])
@@ -315,22 +315,22 @@ def main():
 
   for i, timeslice in enumerate(plot_slice):
     fig.add_subplot(gs[0,(i + 1)])
-    plt.imshow(fmc_xe136[0][0][0][timeslice] ,cmap = 'viridis')
+    plt.imshow(fmc_xe136[0][0][0][timeslice] , norm=Normalize(vmin=0, vmax=2.0), cmap = 'viridis')
     plt.title(str((timeslice - 5) * 20.0) + 'ns - ' + str((timeslice-4) * 20.0) + 'ns' )
-    plt.xlabel(r'$\theta$')
-    plt.ylabel(r'$\phi$')
+    plt.xlabel(r'$\theta$', fontsize = 20)
+    plt.ylabel(r'$\phi$', fontsize = 20)
   for i, timeslice in enumerate(plot_slice):
     fig.add_subplot(gs[1,(i + 1)])
-    plt.imshow(fmc_c10[0][0][0][timeslice] , cmap = 'viridis')
+    plt.imshow(fmc_c10[0][0][0][timeslice] , norm=Normalize(vmin=0, vmax=2.0), cmap = 'viridis')
     plt.title(str((timeslice - 5) * 20.0) + 'ns - ' + str((timeslice-4) * 20.0) + 'ns' )
-    plt.xlabel(r'$\theta$')
-    plt.ylabel(r'$\phi$')
+    plt.xlabel(r'$\theta$', fontsize = 20)
+    plt.ylabel(r'$\phi$', fontsize = 20)
 
   loss_ax_scale = fig.add_subplot(gs[:,5])
-  loss_scale = np.linspace(5, 0, 100)
+  loss_scale = np.linspace(2, 0, 100)
   loss_scale = np.transpose(loss_scale.reshape(loss_scale.shape+(1,)))
   loss_ax_scale.set_xticks([])
-  ticklabel_loss = np.linspace(5, 0, 6.5)
+  ticklabel_loss = np.linspace(2, 0, 6.5)
   ticklabel_loss =   ['%.3f' % i for i in ticklabel_loss]
   ticklabel_loss.insert(0,'0')
   loss_ax_scale.set_yticklabels(ticklabel_loss)
