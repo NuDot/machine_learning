@@ -2,7 +2,7 @@
 import math
 from functools import lru_cache
 from keras import backend as K
-import tensorflow.spectral as tf
+from tensorflow import spectral as tf
 import numpy as np
 
 

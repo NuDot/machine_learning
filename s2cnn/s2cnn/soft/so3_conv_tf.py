@@ -2,7 +2,7 @@ from keras import backend as K
 from keras.engine.topology import Layer
 
 import math 
-from so3_fft import so3_rfft, so3_rifft
+from s2cnn.soft.so3_fft import so3_rfft, so3_rifft
 from s2cnn import so3_rft
 
 class SO3Convolution(Layer):
