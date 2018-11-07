@@ -8,17 +8,12 @@
 # This code is used to convert MC simulated .root file into a 2D grid,
 # then it saves the code as a CSR sparse matrix.
 #############################################################
-#############################################################
-#############################################################
-#############################################################
-#############################################################
-#############################################################
-#############################################################
 import argparse
 import math
 import os
 import json
 from scipy import sparse
+from scipy import constants as const
 from random import *
 import numpy as np
 import time
@@ -36,8 +31,8 @@ N_PMTS = len(PMT_POSITION)
 COLS = int(math.sqrt(N_PMTS/2))
 ROWS = COLS *2
 RUN_TIMESTAMP = time.time()
-MAX_PRESSURE = 20
-QE_FACTOR = 1.0
+MAX_PRESSURE = 10
+QE_FACTOR = 0.5
 FIRST_PHOTON = False
 
 #Clock class: dealing with the input time of the photon hit.
@@ -153,6 +148,10 @@ def savefile(saved_file, appendix, filename, pathname):
         with open(filename, 'w') as datafile:
           json.dump(saved_file, datafile)
 
+#Extend the time of photon track through the buffer oil region.
+def time_extend(time, wavelength):
+  return time + (2.5 / (const.c/(1.44983 + 12860.6/(wavelength**2)))) * 1E9
+
 # Smear the input photon time as a gaussian with given TTS, for KamLAND it's 1.0s
 def smearing_time(time):
   return np.random.normal(loc=time, scale=1.0)
@@ -165,16 +164,20 @@ def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi)
   n_evts = tree.GetEntries()
   end_evt = min(n_evts, end_evt)
   n_qe_values = MAX_PRESSURE + 1
-  photocoverage_scale = list(np.linspace(0.2159, 0.3173, 9))
-  shrink_list = [] # Shrink event out of the dataset that failed the energy cut
-  # feature map = [Photocoverage Pressure, QE Pressure, event, clock tick, theta, phi]
+  photocoverage_scale = list(np.linspace(0.3173, 0.2159, 9))
+  shrink_list = []
+  vertex_list = []
+  direction_list = []
   feature_map_collections = np.zeros(((((len(photocoverage_scale), n_qe_values, (end_evt-start_evt), current_clock.clock_size(), ROWS, COLS)))))
   for evt_index in tqdm(range(start_evt, end_evt)):
     tree.GetEntry(evt_index)
-    if (tree.edep < elow) or (tree.edep > ehi):
+    rlength = (tree.trueVtxX**2 + tree.trueVtxY**2 + tree.trueVtxZ**2)**0.5
+    if (rlength > 150.4):
       shrink_list.append(evt_index)
       continue
     current_clock = set_clock(tree, evt_index)
+    vertex_list.append([tree.trueVtxX,tree.trueVtxY,tree.trueVtxZ])
+    direction_list.append([tree.trueDirX,tree.trueDirY,tree.trueDirZ])
     for i in range(tree.N_phot):
     #for i in range(10):
       ###############################################
@@ -184,21 +187,22 @@ def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi)
         if (pmt_allocator(pmt_angle, detector_radius, pressure_pc)):
           row, col = xyz_to_row_col(PMT_POSITION[pmt_index][0], PMT_POSITION[pmt_index][1], PMT_POSITION[pmt_index][2])
           for pressure_pe in range (0, n_qe_values):
-            # tree.PE_creation[i] == true means the photon passes the intrinsic MC QE mechanism, therefore it should always be accepted.
             if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
-              time_index = current_clock.tick(smearing_time(tree.true_time[i]))
+              true_time = time_extend(tree.true_time[i], tree.photon_wavelength[i])
+              time_index = current_clock.tick(smearing_time(true_time))
               feature_map_collections[photocoverage_scale.index(pressure_pc)][pressure_pe][evt_index - start_evt][time_index][row][col] += 1.0
-  feature_map_collections = np.delete(feature_map_collections, shrink_list ,2)# Clear empty event that failed energy cut
+  feature_map_collections = np.delete(feature_map_collections, shrink_list ,2)
   dim1, dim2, dim3, dim4, dim5, dim6 = feature_map_collections.shape
   lst = np.zeros((dim3,dim4,1))
   input_name = os.path.basename(input).split('.')[0]
   data_path = os.path.join(outputdir, "data_%s.%d.%d" % (input_name, start_evt, end_evt))
   indices_path = os.path.join(outputdir, "indices_%s.%d.%d" % (input_name, start_evt, end_evt))
   indptr_path = os.path.join(outputdir, "indptr_%s.%d.%d" % (input_name, start_evt, end_evt))
+  vertex_path = os.path.join(outputdir, "vertex_%s.%d.%d" % (input_name, start_evt, end_evt))
+  direction_path = os.path.join(outputdir, "direction_%s.%d.%d" % (input_name, start_evt, end_evt))
   data = lst.tolist()
   indices = lst.tolist()
   indptr = lst.tolist()
-  # Converting the feature map to a sparse matrix, this both save harddisk spaces and save memory for training.
   for qcindex, qc in enumerate(feature_map_collections):
     for qeindex, qe in enumerate(qc): 
       currentEntry = qe
@@ -214,6 +218,8 @@ def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi)
       savefile(data, 'data', qcqename, data_path)
       savefile(indices, 'indices', qcqename, indices_path)
       savefile(indptr, 'indptr', qcqename, indptr_path)
+      savefile(vertex_list, 'vertex', qcqename, vertex_path)
+      savefile(direction_list, 'direction', qcqename, direction_path)
   return feature_map_collections
 
 

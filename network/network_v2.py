@@ -75,6 +75,12 @@ def reconstruct_image(Xarray):
       output[evt_index][time_index] = time.todense()
   return output
 
+def cosine_loss_vertex(vertex_pos):
+  def loss(y_true, y_pred):
+    y_pred = y_pred - vertex_pos
+    return cosine_proximity(y_true, y_pred)
+  return loss
+
 # CNN Model
 def createModel():
   model = Sequential()
@@ -151,7 +157,7 @@ def train(data, labels, save_prefix=''):
   my_network = createModel()
   batch_size = 100
   epochs = 30
-  my_network.compile(optimizer='rmsprop', loss='cosine_proximity', metrics=['accuracy'])
+  my_network.compile(optimizer='rmsprop', loss=cosine_loss_vertex(V), metrics=['accuracy'])
   history = my_network.fit_generator(generator=batch_generator(trainX, trainY, batch_size),
                     epochs=epochs, steps_per_epoch=(trainX.shape[0]/batch_size), use_multiprocessing=True,
                     validation_data=batch_generator(testX, testY, batch_size), validation_steps = (testX.shape[0]/batch_size))
@@ -194,29 +200,23 @@ def main():
   qe_index = args.qe_index
   json_name = str(time_index) + '_' + str(qe_index) + '.json'
   signal_images = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.signallist, 'r')) if component in filename] for component in ['data_', 'indices_', 'indptr_']]
-  #print("Reading Signal Complete")
-  background_images = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.bglist, 'r')) if component in filename] for component in ['data_', 'indices_', 'indptr_']]
-  #print("Reading Background Complete")
 
   #create objective numpy array with each entry as a sparse matrix.
   signal_images = ceate_table(signal_images)
-  #print("Signal Table Created")
-  background_images = ceate_table(background_images)
-  #print("Background Table Created")
 
-  dimensions = min(signal_images.shape[0], background_images.shape[0])
+  signal_vertex = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.signallist, 'r')) if component in filename] for component in ['vertex_']]
+  signal_vertex = np.array(signal_vertex[0][0])
+  print signal_vertex.shape
 
-  #Make sure signal_images and background images contains the same amount of events.
-  signal_images = signal_images[0:dimensions]
-  background_images = background_images[0:dimensions]
-
-  data, labels = label_data(signal_images, background_images)
+  signal_direction = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.signallist, 'r')) if component in filename] for component in ['direction_']]
+  signal_direction = np.array(signal_direction[0][0])
+  print signal_direction.shape
 
   save_prefix = os.path.join(args.outdir, "%s_%s_qe%d_time%d_%d_" % (
       args.signal, args.bg, args.qe_index, args.time_index, time.time()))
   #print(save_prefix)
 
-  train(data, labels, save_prefix)
+  train(signal_images, signal_direction, vertex, save_prefix)
 
 
 main()

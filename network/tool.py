@@ -12,9 +12,10 @@ from datetime import datetime
 import numpy as np
 from keras.callbacks import LearningRateScheduler
 
-DIM1 = 136
-DIM2 = 68
-DIM3 = 40
+#Dimension of input data
+DIM1 = 50#ROWS
+DIM2 = 25#COLS
+DIM3 = 34#Time(channels)
 
 def label_data(signal_images, background_images):
   labels = np.array([1] * len(signal_images) + [0] * len(background_images))
@@ -80,7 +81,7 @@ def ceate_table(sparse_set):
   data = data_set[0]
   indices = indices_set[0]
   indptr = indptr_set[0]
-  for index in range(1,len(data_set)):
+  for index in range(len(data_set)):
     data += data_set[index]
     indices += indices_set[index]
     indptr += indptr_set[index]

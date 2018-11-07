@@ -13,14 +13,13 @@ import subprocess
 
 OUT_DIR = "/projectnb/snoplus/sphere_data/Xe136_C10_smeared_isotropic/"
 #OUT_DIR = "/projectnb/snoplus/sphere_data/Xe136_C10_balloon_tuned/"
-ZDAB_DIR = "/projectnb/snoplus/sphere_data/KamLAND_Smeared/"
-C10_DIR = "/projectnb/snoplus/sphere_data/c10_2MeV"
-MACRO_DIR = "/projectnb/snoplus/machine_learning/data/training_log/KL_smeared_isotropic/"
+ZDAB_DIR = "/projectnb/snoplus/sphere_data/kamland_direction/"
+MACRO_DIR = "/projectnb/snoplus/machine_learning/data/training_log/KL_direction/"
 TIME = "8:00:00"
 TIME_PRESSURE = 9
 QE_PRESSSURE = 11
-PROCESSOR = "/projectnb/snoplus/machine_learning/network/network_v2.py"
-# KEYWORD = "center"
+PROCESSOR = "/project/snoplus/machine_learning/network/network_v2.py"
+#KEYWORD = "center"
 KEYWORD = "dVrndVtx_3p0mSphere"
 
 # REPROCESS = [[0, 5],
@@ -47,11 +46,11 @@ def main():
         continue
       if 'Te130' in target_run:
         continue
-      if not len(os.listdir(ZDAB_DIR + target_run)) == 189:
+      if not len(os.listdir(ZDAB_DIR + target_run)) == 99:
         print target_run
         continue
       target_run_number = '_' + get_name(target_run)[2] + '.'
-      if len([f for f in zdabfiles if target_run_number in f]) % 3 == 0:
+      if len([f for f in zdabfiles if target_run_number in f]) % 5 == 0:
         zdabfiles_pure.append(target_run)
     zdabfiles = zdabfiles_pure
     print len(zdabfiles)
@@ -64,9 +63,7 @@ def main():
         filename_array[key] = []
       filename_array[key].append(str(ZDAB_DIR + npyfile))
     #########################################################
-    training_combo = {}
     for key in filename_array.keys():
-      training_combo[key] = []
       with cd(MACRO_DIR):
         writefile = open(str(key + KEYWORD +'.dat'),"w")
         for filename in filename_array[key]:
@@ -75,7 +72,7 @@ def main():
     ##############################################################
 
     #training_combo['Te130'].append('1el_2p529MeVrndDir')
-    training_combo['Xe136'] = ['C10']
+    #training_combo['Xe136'] = ['C10']
 
     # with cd(MACRO_DIR):
     #   for signal, backgrounds in training_combo.iteritems():
