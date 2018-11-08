@@ -2,7 +2,7 @@
 import math
 from functools import lru_cache
 from keras import backend as K
-import tensorflow.spectral as tf
+import tensorflow as tf
 import numpy as np
 
 from string import Template
@@ -16,14 +16,15 @@ def s2_fft(x, for_grad=False, b_out=None):
     :param x: [..., beta, alpha]
     :return:  [l * m, ...]
     '''
+
     #assert x.size(-1) == 2
-    assert K.dtype(x) == 'complex64'
+    assert K.dtype(x) == 'complex64'#Changeme
     #b_in = x.size(-2) // 2
-    b_in = K.int_shape(x)[-2]  // 2
+    b_in = K.int_shape(x)[-1]  // 2
     #assert x.size(-2) == 2 * b_in
-    assert K.int_shape(x)[-2] == 2 * b_in
+    assert K.int_shape(x)[-1] == 2 * b_in
     #assert x.size(-3) == 2 * b_in
-    assert K.int_shape(x)[-3] == 2 * b_in
+    assert K.int_shape(x)[-2] == 2 * b_in
     if b_out is None:
         b_out = b_in
     assert b_out <= b_in
@@ -39,7 +40,7 @@ def s2_fft(x, for_grad=False, b_out=None):
     '''
     nspec = b_out ** 2
     #nbatch = x.size(0)
-    nbatch = K.int_shape(x)[0]
+    nbatch = tf.shape(x)[0]
 
     #wigner = _setup_wigner(b_in, nl=b_out, weighted=not for_grad, device_type=x.device.type, device_index=x.device.index)
     w = _setup_wigner(b_in, nl=b_out, weighted=not for_grad)
@@ -47,23 +48,31 @@ def s2_fft(x, for_grad=False, b_out=None):
     w = K.constant(w, dtype='complex64')
     #wigner = wigner.view(2 * b_in, -1)  # [beta, l * m] (2 * b_in, nspec)
     w = K.reshape(w, [2 * b_in, -1]) # [beta, l * m] (2 * b_in, nspec)
-    w = K.eval(w)
 
     #x = torch.fft(x, 1)  # [batch, beta, m, complex]
-    x = tf.fft(x) # [batch, beta, m]
-    x = K.eval(x)
+    x = tf.spectral.fft(x) # [batch, beta, m]
+    # tf.cast(x, 'float32')
+    # print(x)
+    # x = K.eval(x)
 
-    #output = x.new_empty((nspec, nbatch, 2))
-    output = np.zeros(shape=(nspec, nbatch))
-    output = K.constant(output, dtype='complex64')
-    output = K.eval(output)
+    # #output = x.new_empty((nspec, nbatch, 2))
+    # print(nspec, nbatch)
+    # output = np.zeros(shape=(nspec, nbatch))
+    # output = K.constant(output, dtype='complex64')
+    # output = K.eval(output)
+    output = tf.Variable(tf.placeholder(shape=[nspec, None], dtype = tf.complex64))
+
+    print("Abigail2")
 
     for l in range(b_out):
             s = slice(l ** 2, l ** 2 + 2 * l + 1)
+            print(s)
             #xx = torch.cat((x[:, :, -l:], x[:, :, :l + 1]), dim=2) if l > 0 else x[:, :, :1]
-            xx = np.concatenate((x[:, :, -l:], x[:, :, :l+1]), axis=2) if l > 0 else x[:, :, :1]
+            xx = K.concatenate((x[:, :, -l:], x[:, :, :l+1]), axis=2) if l > 0 else x[:, :, :1]
             #output[s] = torch.einsum("bm,zbmc->mzc", (wigner[:, s], xx))
-            output[s] = np.einsum("bm,zbm->mz", w[:, s], xx)
+            tf.assign(output[s], tf.einsum("bm,zbm->mz", w[:, s], xx))
+
+    print("Abigail3")
 
     #output = output.view(-1, *batch_size, 2)  # [l * m, ..., complex] (nspec, ..., 2)
     output = K.reshape(output,[-1, *batch_size])  # [l * m, ...] (nspec, ...)

@@ -1,16 +1,20 @@
 from keras import backend as K
+from keras import activations
+from keras import initializers
+from keras import regularizers
+from keras import constraints
 from keras.engine.topology import Layer
 
 import math 
-from so3_fft import so3_rfft, so3_rifft
-from s2cnn import so3_rft
+from s2cnn.soft.so3_fft import so3_rfft, so3_rifft
+from s2cnn.so3_ft import so3_rft
 
 class SO3Convolution(Layer):
 
-    def __init__(self, output_dim, nfeature_in, nfeature_out, b_in, b_out, grid,use_bias=True,
+    def __init__(self, output_dim, nfeature_in, b_in, b_out, grid,use_bias=False,
                  bias_initializer='zeros', bias_regularizer=None, bias_constraint=None, **kwargs):
         self.nfeature_in = nfeature_in
-        self.nfeature_out = nfeature_out
+        self.output_dim = output_dim
         self.b_in = b_in
         self.b_out = b_out
         self.grid = grid
@@ -23,15 +27,15 @@ class SO3Convolution(Layer):
         super(SO3Convolution, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        assert isinstance(input_shape, list)
+        #assert isinstance(input_shape, list)
         # Create a trainable weight variable for this layer.
         self.kernel = self.add_weight(name='kernel',
-                                      shape=(self.nfeature_in, self.nfeature_out, len(self.grid)),
+                                      shape=(self.nfeature_in, self.output_dim, len(self.grid)),
                                       initializer='uniform',
                                       trainable=True)
         #setup bias
         if self.use_bias:
-            self.bias = self.add_weight(shape=(self.filters,),
+            self.bias = self.add_weight(shape=(1, output_dim, 1, 1, 1),
                                         initializer=self.bias_initializer,
                                         name='bias',
                                         regularizer=self.bias_regularizer,
@@ -41,7 +45,7 @@ class SO3Convolution(Layer):
 
         self.scaling = 1. / math.sqrt(len(self.grid) * self.nfeature_in * (self.b_out ** 3.) / (self.b_in ** 3.))
 
-        super(MyLayer, self).build(input_shape)  # Be sure to call this at the end
+        super(SO3Convolution, self).build(input_shape)  # Be sure to call this at the end
 
     def call(self, x):
         assert K.int_shape(x)[1] == self.nfeature_in
@@ -62,7 +66,7 @@ class SO3Convolution(Layer):
 
         if self.use_bias:
             z = K.eval(z)
-            z = z + self.bias
+            z = z + K.eval(self.bias)
             z = K.constant(z)
 
         return z
@@ -70,9 +74,9 @@ class SO3Convolution(Layer):
         #a, b = x
         #return [K.dot(a, self.kernel) + b, K.mean(b, axis=-1)]
 
-    def compute_output_shape(self, input_shape):
-        assert isinstance(input_shape, list)
-        shape_a, shape_b = input_shape
-        return [(shape_a[0], self.output_dim), shape_b[:-1]]
+    # def compute_output_shape(self, input_shape):
+    #     assert isinstance(input_shape, list)
+    #     shape_a, shape_b = input_shape
+    #     return [(shape_a[0], self.output_dim), shape_b[:-1]]
 
 

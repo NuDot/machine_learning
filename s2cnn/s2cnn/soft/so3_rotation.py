@@ -2,7 +2,7 @@
 from keras import backend as K
 import numpy as np
 
-from so3_fft import so3_rfft, so3_rifft
+from s2cnn.soft.so3_fft import so3_rfft, so3_rifft
 from functools import lru_cache
 #from s2cnn.utils.decorator import cached_dirpklgz
 

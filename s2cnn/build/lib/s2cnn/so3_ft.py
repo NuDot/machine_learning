@@ -1,8 +1,10 @@
 # pylint: disable=R,C,E1101
-import torch
+#import torch
+from keras import backend as K
+
 import numpy as np
 from functools import lru_cache
-from s2cnn.utils.decorator import cached_dirpklgz
+#from s2cnn.utils.decorator import cached_dirpklgz
 
 
 def so3_rft(x, b, grid):
@@ -14,17 +16,29 @@ def so3_rft(x, b, grid):
     :return: [l * m * n, ..., complex]
     """
     # F is the Fourier matrix
-    F = _setup_so3_ft(b, grid, device_type=x.device.type, device_index=x.device.index)  # [beta_alpha_gamma, l * m * n, complex]
+    #F = _setup_so3_ft(b, grid, device_type=x.device.type, device_index=x.device.index)  # [beta_alpha_gamma, l * m * n, complex]
+    F = _setup_so3_ft(b, grid)  # [beta_alpha_gamma, l * m * n]
+    #assert x.size(-1) == F.size(0)
+    assert K.int_shape(x)[-1] == K.int_shape(F)[0]
 
-    assert x.size(-1) == F.size(0)
-
-    sz = x.size()
-    x = torch.einsum("ia,afc->fic", (x.view(-1, x.size(-1)), F.clone()))  # [l * m * n, ..., complex]
-    x = x.view(-1, *sz[:-1], 2)
+    #sz = x.size()
+    x = K.eval(x)
+    x = K.constant(x, dtype='complex64')
+    sz = K.int_shape(x)
+    #x = torch.einsum("ia,afc->fic", (x.view(-1, x.size(-1)), F.clone()))  # [l * m * n, ..., complex]
+    x = K.reshape(x, [-1, K.int_shape(x)[-1]])
+    x = K.eval(x)
+    F = K.eval(F)
+    print(np.shape(x))
+    print(np.shape(F))
+    #x = np.einsum("ia,af->fi", x, np.copy(F))    # [l * m * n, ...]
+    #x = np.einsum("ia,afc->fic", x, F) 
+    #x = x.view(-1, *sz[:-1], 2)
+    #x = K.reshape(x, [-1, *sz[:-1]])
     return x
 
 
-@cached_dirpklgz("cache/setup_so3_ft")
+#@cached_dirpklgz("cache/setup_so3_ft")
 def __setup_so3_ft(b, grid):
     from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
 
@@ -53,10 +67,12 @@ def __setup_so3_ft(b, grid):
 
 
 @lru_cache(maxsize=32)
-def _setup_so3_ft(b, grid, device_type, device_index):
+#def _setup_so3_ft(b, grid, device_type, device_index):
+def _setup_so3_ft(b, grid):
     F = __setup_so3_ft(b, grid)
 
     # convert to torch Tensor
-    F = torch.tensor(F.astype(np.float32), dtype=torch.float32, device=torch.device(device_type, device_index))  # pylint: disable=E1102
-
+    #F = torch.tensor(F.astype(np.float32), dtype=torch.float32, device=torch.device(device_type, device_index))  # pylint: disable=E1102
+    # convert to keras tensor
+    F = K.constant(F, dtype='complex64') ##################################################################################################################
     return F
