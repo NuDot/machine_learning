@@ -2,7 +2,7 @@
 import math
 from functools import lru_cache
 from keras import backend as K
-from tensorflow import spectral as tf
+import tensorflow.spectral as tf
 import numpy as np
 
 
@@ -231,12 +231,9 @@ def so3_rifft(x, for_grad=False, b_out=None):
 
 
 @lru_cache(maxsize=32)
-#def _setup_wigner(b, nl, weighted, device_type, device_index):
 def _setup_wigner(b, nl, weighted):
     dss = _setup_so3_fft(b, nl, weighted)
-    #dss = torch.tensor(dss, dtype=torch.float32, device=torch.device(device_type, device_index))  # [beta, l * m * n] # pylint: disable=E1102
     dss = K.constant(dss, dtype='float32')
-    #return dss.contiguous()
     return dss
 
 #@cached_dirpklgz("cache/setup_so3_fft")

@@ -1,27 +1,25 @@
 # pylint: disable=C,R,E1101
-from keras import backend as K
+import torch
 import numpy as np
 
-from s2cnn.soft.so3_fft import so3_rfft, so3_rifft
+from .gpu.so3_fft import SO3_fft_real, SO3_ifft_real
+from s2cnn.utils.complex import complex_mm
 from functools import lru_cache
-#from s2cnn.utils.decorator import cached_dirpklgz
+from s2cnn.utils.decorator import cached_dirpklgz
 
 
 def so3_rotation(x, alpha, beta, gamma):
     '''
     :param x: [..., beta, alpha, gamma] (..., 2b, 2b, 2b)
     '''
-    #b = x.size()[-1] // 2
-    #x_size = x.size()
-    x_size = K.int_shape(x)
-    b = x_size[-1] // 2
+    b = x.size()[-1] // 2
+    x_size = x.size()
 
-    Us = _setup_so3_rotation(b, alpha, beta, gamma)
+    Us = _setup_so3_rotation(b, alpha, beta, gamma, device_type=x.device.type, device_index=x.device.index)
 
     # fourier transform
-    x = so3_rfft(x)  # [l * m * n, ...]
-    x = K.eval(x)
-    
+    x = SO3_fft_real()(x)  # [l * m * n, ..., complex]
+
     # rotated spectrum
     Fz_list = []
     begin = 0
@@ -30,27 +28,27 @@ def so3_rotation(x, alpha, beta, gamma):
         size = L ** 2
 
         Fx = x[begin:begin+size]
-        Fx = np.reshape(Fx, [L, -1]) # [m, n * batch]
+        Fx = Fx.view(L, -1, 2)  # [m, n * batch, complex]
 
-        U = K.reshape(Us[l], [L, L]) # [m, n]
-        U = K.eval(U)
+        U = Us[l].view(L, L, 2)  # [m, n, complex]
 
-        Fz = np.matmul(np.conj(U), Fx) # [m, n * batch]
+        Fz = complex_mm(U, Fx, conj_x=True)  # [m, n * batch, complex]
 
-        Fz = np.reshape(Fz, [size, -1])   # [m * n, batch]
+        Fz = Fz.view(size, -1, 2)  # [m * n, batch, complex]
         Fz_list.append(Fz)
 
         begin += size
 
-    Fz = K.concatenate(Fz_list, 0) # [l * m * n, batch]
-    z = so3_rifft(Fz)
+    Fz = torch.cat(Fz_list, 0)  # [l * m * n, batch, complex]
+    z = SO3_ifft_real()(Fz)
 
-    z = K.reshape(z, [*x_size])
+    z = z.contiguous()
+    z = z.view(*x_size)
 
     return z
 
 
-#@cached_dirpklgz("cache/setup_so3_rotation")
+@cached_dirpklgz("cache/setup_so3_rotation")
 def __setup_so3_rotation(b, alpha, beta, gamma):
     from lie_learn.representations.SO3.wigner_d import wigner_D_matrix
 
@@ -59,18 +57,16 @@ def __setup_so3_rotation(b, alpha, beta, gamma):
           for l in range(b)]
     # Us[l][m, n] = exp(i m alpha) d^l_mn(beta) exp(i n gamma)
 
-    #Us = [Us[l].astype(np.complex64).view(np.comlex64).reshape((2 * l + 1, 2 * l + 1)) for l in range(b)] ############################
-	#Us = [np.reshape(Us[l], [2 * l + 1, 2 * l + 1]) for l in range(b)]
+    Us = [Us[l].astype(np.complex64).view(np.float32).reshape((2 * l + 1, 2 * l + 1, 2)) for l in range(b)]
 
     return Us
 
 
 @lru_cache(maxsize=32)
-#def _setup_so3_rotation(b, alpha, beta, gamma, device_type, device_index):
-def _setup_so3_rotation(b, alpha, beta, gamma):    
+def _setup_so3_rotation(b, alpha, beta, gamma, device_type, device_index):
     Us = __setup_so3_rotation(b, alpha, beta, gamma)
 
-    # covert to keras tensor
-    Us = [K.constant(U, dtype='complex64') for U in Us]
+    # convert to torch Tensor
+    Us = [torch.tensor(U, dtype=torch.float32, device=torch.device(device_type, device_index)) for U in Us]  # pylint: disable=E1102
 
     return Us

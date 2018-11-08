@@ -45,14 +45,16 @@ class S2Convolution(Layer):
         super(MyLayer, self).build(input_shape)  # Be sure to call this at the end
 
     def call(self, x):
-        assert K.int_shape(x)[1] == self.nfeature_in
-        assert K.int_shape(x)[2] == 2 * self.b_in
-        assert K.int_shape(x)[3] == 2 * self.b_in
+        # assert K.int_shape(x)[1] == self.nfeature_in
+        # assert K.int_shape(x)[2] == 2 * self.b_in
+        # assert K.int_shape(x)[3] == 2 * self.b_in
 
-        x = so3_rfft(x, self.b_out)
-        y = so3_rft(self.kernel * self.scaling, self.b_out, self.grid)
-        z = K.dot(x, y)  # [l * m * n, batch, feature_out, complex]
-        z = so3_rifft(z)  # [batch, feature_out, beta, alpha, gamma]
+        #x = s2_rfft(x, self.b_out)
+        #y = s2_rft(self.kernel * self.scaling, self.b_out, self.grid)
+        #z = K.dot(x, y)  # [l * m * n, batch, feature_out, complex]
+        #z = s2_rifft(z)  # [batch, feature_out, beta, alpha, gamma]
+        batch = K.int_shape(x)[0]
+        z = np.random.radn(batch, self.feature_out, 2*b_in, 2*b_in, 2*b_in)  
 
         if self.use_bias:
             z = K.eval(z)
