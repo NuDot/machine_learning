@@ -38,7 +38,7 @@ def main():
     #Looking for the input file in given input directory.
     zdabfiles = [(ifile) for ifile in sorted(os.listdir(ZDAB_DIR), key = lambda f:(int(get_name(f)[2]) , get_name(f)[0])) if KEYWORD in ifile]
 
-    print len(zdabfiles)
+    #print len(zdabfiles)
 
     zdabfiles_pure = []
     for target_run in zdabfiles:
@@ -47,13 +47,13 @@ def main():
       if 'Te130' in target_run:
         continue
       if not len(os.listdir(ZDAB_DIR + target_run)) == 99:
-        print target_run
+        #print target_run
         continue
       target_run_number = '_' + get_name(target_run)[2] + '.'
       if len([f for f in zdabfiles if target_run_number in f]) % 5 == 0:
         zdabfiles_pure.append(target_run)
     zdabfiles = zdabfiles_pure
-    print len(zdabfiles)
+    #print len(zdabfiles)
 
     filename_array = {}
     for npyfile in zdabfiles:

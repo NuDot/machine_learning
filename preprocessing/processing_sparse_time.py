@@ -12,6 +12,7 @@ import argparse
 import math
 import os
 import json
+import pickle
 from scipy import sparse
 from scipy import constants as const
 from random import *
@@ -28,8 +29,10 @@ for pmt in np.loadtxt("/projectnb/snoplus/machine_learning/prototype/pmt.txt").t
     if (pmt[-1] == 17.0):
       PMT_POSITION.append([pmt[-4], pmt[-3], pmt[-2]])
 N_PMTS = len(PMT_POSITION)
-COLS = int(math.sqrt(N_PMTS/2))
-ROWS = COLS *2
+COLS = math.sqrt(N_PMTS/2)
+COLS = int(math.ceil(COLS / 2) * 2)
+print COLS
+ROWS = COLS
 RUN_TIMESTAMP = time.time()
 MAX_PRESSURE = 10
 QE_FACTOR = 0.5
@@ -169,57 +172,81 @@ def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi)
   vertex_list = []
   direction_list = []
   feature_map_collections = np.zeros(((((len(photocoverage_scale), n_qe_values, (end_evt-start_evt), current_clock.clock_size(), ROWS, COLS)))))
-  for evt_index in tqdm(range(start_evt, end_evt)):
-    tree.GetEntry(evt_index)
-    rlength = (tree.trueVtxX**2 + tree.trueVtxY**2 + tree.trueVtxZ**2)**0.5
-    if (rlength > 150.4):
-      shrink_list.append(evt_index)
-      continue
-    current_clock = set_clock(tree, evt_index)
-    vertex_list.append([tree.trueVtxX,tree.trueVtxY,tree.trueVtxZ])
-    direction_list.append([tree.trueDirX,tree.trueDirY,tree.trueDirZ])
-    for i in range(tree.N_phot):
-    #for i in range(10):
-      ###############################################
-      pmt_index, detector_radius, pmt_angle = pmt_setup([tree.x_hit[i],tree.y_hit[i],tree.z_hit[i]])
-      ###############################################
-      for pressure_pc in photocoverage_scale:
-        if (pmt_allocator(pmt_angle, detector_radius, pressure_pc)):
-          row, col = xyz_to_row_col(PMT_POSITION[pmt_index][0], PMT_POSITION[pmt_index][1], PMT_POSITION[pmt_index][2])
-          for pressure_pe in range (0, n_qe_values):
-            if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
-              true_time = time_extend(tree.true_time[i], tree.photon_wavelength[i])
-              time_index = current_clock.tick(smearing_time(true_time))
-              feature_map_collections[photocoverage_scale.index(pressure_pc)][pressure_pe][evt_index - start_evt][time_index][row][col] += 1.0
-  feature_map_collections = np.delete(feature_map_collections, shrink_list ,2)
-  dim1, dim2, dim3, dim4, dim5, dim6 = feature_map_collections.shape
-  lst = np.zeros((dim3,dim4,1))
   input_name = os.path.basename(input).split('.')[0]
-  data_path = os.path.join(outputdir, "data_%s.%d.%d" % (input_name, start_evt, end_evt))
-  indices_path = os.path.join(outputdir, "indices_%s.%d.%d" % (input_name, start_evt, end_evt))
-  indptr_path = os.path.join(outputdir, "indptr_%s.%d.%d" % (input_name, start_evt, end_evt))
-  vertex_path = os.path.join(outputdir, "vertex_%s.%d.%d" % (input_name, start_evt, end_evt))
-  direction_path = os.path.join(outputdir, "direction_%s.%d.%d" % (input_name, start_evt, end_evt))
-  data = lst.tolist()
-  indices = lst.tolist()
-  indptr = lst.tolist()
-  for qcindex, qc in enumerate(feature_map_collections):
-    for qeindex, qe in enumerate(qc): 
-      currentEntry = qe
-      if (qe.max() != 0):
-        currentEntry = np.divide(qe, (1.2 * qe.max()))
-      for evt_index, evt in enumerate(currentEntry):
-        for time_index, maps in enumerate(evt):
-          sparse_map = sparse.csr_matrix(maps)
-          data[evt_index][time_index] = map(float, sparse_map.data)
-          indices[evt_index][time_index] = map(int, sparse_map.indices)
-          indptr[evt_index][time_index] = map(int, sparse_map.indptr)
-      qcqename = str(qcindex) + '_' + str(qeindex) + '.json'
-      savefile(data, 'data', qcqename, data_path)
-      savefile(indices, 'indices', qcqename, indices_path)
-      savefile(indptr, 'indptr', qcqename, indptr_path)
-      savefile(vertex_list, 'vertex', qcqename, vertex_path)
-      savefile(direction_list, 'direction', qcqename, direction_path)
+  with open(os.path.join(outputdir, "eventfile_%s.%d.%d.pickle" % (input_name, start_evt, end_evt)), 'wb') as handle:
+    for evt_index in tqdm(range(start_evt, end_evt)):
+      event_dict = {}
+      tree.GetEntry(evt_index)
+      rlength = (tree.trueVtxX**2 + tree.trueVtxY**2 + tree.trueVtxZ**2)**0.5
+      if (rlength > 150.4):
+        shrink_list.append(evt_index)
+        continue
+      event_dict['id'] = evt_index
+      event_dict['vertex'] = [tree.trueVtxX,tree.trueVtxY,tree.trueVtxZ]
+      event_dict['direction'] = [tree.trueDirX,tree.trueDirY,tree.trueDirZ]
+      #for i in range(tree.N_phot):
+      current_clock = set_clock(tree, evt_index)
+      #vertex_list.append([tree.trueVtxX,tree.trueVtxY,tree.trueVtxZ])
+      #direction_list.append([tree.trueDirX,tree.trueDirY,tree.trueDirZ])
+      for i in range(tree.N_phot):
+        if (tree.process[i] == 0):
+          continue
+        ###############################################
+        pmt_index, detector_radius, pmt_angle = pmt_setup([tree.x_hit[i],tree.y_hit[i],tree.z_hit[i]])
+        ###############################################
+        for pressure_pc in photocoverage_scale:
+          if (pmt_allocator(pmt_angle, detector_radius, pressure_pc)):
+            row, col = xyz_to_row_col(PMT_POSITION[pmt_index][0], PMT_POSITION[pmt_index][1], PMT_POSITION[pmt_index][2])
+            for pressure_pe in range (0, n_qe_values):
+              if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
+                true_time = time_extend(tree.true_time[i], tree.photon_wavelength[i])
+                time_index = current_clock.tick(smearing_time(true_time))
+                feature_map_collections[photocoverage_scale.index(pressure_pc)][pressure_pe][evt_index - start_evt][time_index][row][col] += 1.0
+      #event_map = np.transpose(feature_map_collections, (2,0,1,3,4,5))[evt_index - start_evt]
+      for qcindex, qc in enumerate(feature_map_collections):
+        for qeindex, qe in enumerate(qc):
+            time_sequence = []
+            for time_index, maps in enumerate(qe[evt_index - start_evt]):
+               time_sequence.append(sparse.csr_matrix(maps))
+            event_dict[str(qcindex) + '_' + str(qeindex)] = time_sequence
+      #         data[evt_index][time_index] = map(float, sparse_map.data)
+      #         indices[evt_index][time_index] = map(int, sparse_map.indices)
+      #         indptr[evt_index][time_index] = map(int, sparse_map.indptr)
+      # sparse_map = sparse.csr_matrix(event_map)
+      # event_dict['data'] = map(float, sparse_map.data)
+      # event_dict['indices'] = map(int, sparse_map.indices)
+      # event_dict['indptr'] = map(int, sparse_map.indptr)
+      pickle.dump(event_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    # print(vertex_list, direction_list)
+    # feature_map_collections = np.delete(feature_map_collections, shrink_list ,2)
+    # dim1, dim2, dim3, dim4, dim5, dim6 = feature_map_collections.shape
+    # lst = np.zeros((dim3,dim4,1))
+    # input_name = os.path.basename(input).split('.')[0]
+    # data_path = os.path.join(outputdir, "data_%s.%d.%d" % (input_name, start_evt, end_evt))
+    # indices_path = os.path.join(outputdir, "indices_%s.%d.%d" % (input_name, start_evt, end_evt))
+    # indptr_path = os.path.join(outputdir, "indptr_%s.%d.%d" % (input_name, start_evt, end_evt))
+    # vertex_path = os.path.join(outputdir, "vertex_%s.%d.%d" % (input_name, start_evt, end_evt))
+    # direction_path = os.path.join(outputdir, "direction_%s.%d.%d" % (input_name, start_evt, end_evt))
+    # data = lst.tolist()
+    # indices = lst.tolist()
+    # indptr = lst.tolist()
+    # for qcindex, qc in enumerate(feature_map_collections):
+    #   for qeindex, qe in enumerate(qc): 
+    #     currentEntry = qe
+    #     if (qe.max() != 0):
+    #       currentEntry = np.divide(qe, (1.2 * qe.max()))
+    #     for evt_index, evt in enumerate(currentEntry):
+    #       for time_index, maps in enumerate(evt):
+    #         sparse_map = sparse.csr_matrix(maps)
+    #         data[evt_index][time_index] = map(float, sparse_map.data)
+    #         indices[evt_index][time_index] = map(int, sparse_map.indices)
+    #         indptr[evt_index][time_index] = map(int, sparse_map.indptr)
+    #     qcqename = str(qcindex) + '_' + str(qeindex) + '.json'
+    #     savefile(data, 'data', qcqename, data_path)
+    #     savefile(indices, 'indices', qcqename, indices_path)
+    #     savefile(indptr, 'indptr', qcqename, indptr_path)
+    #     savefile(vertex_list, 'vertex', qcqename, vertex_path)
+    #     savefile(direction_list, 'direction', qcqename, direction_path)
   return feature_map_collections
 
 

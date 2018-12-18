@@ -37,7 +37,9 @@ from keras.layers import BatchNormalization
 from keras.optimizers import Adam, RMSprop
 from keras.utils import to_categorical
 from datetime import datetime
-from tool import load_data, label_data, ceate_table
+from tool import label_data, create_table
+
+import keras.backend as K
 
 #Dimension of input data
 DIM1 = 50#ROWS
@@ -126,7 +128,7 @@ def createModel():
   model.add(Activation('relu'))
   model.add(Dropout(0.5))
   model.add(Dense(3, activation='sigmoid'))
-   
+
   return model
 
 def plot_loss(history, save_prefix=''):
@@ -155,20 +157,19 @@ def train(data, labels, save_prefix=''):
   # ### split into training and test samples
   trainX, testX, trainY, testY = train_test_split(data, labels, test_size=0.25, random_state=42)
   my_network = createModel()
-  batch_size = 100
+  batch_size = 10
   epochs = 30
-  my_network.compile(optimizer='rmsprop', loss=cosine_loss_vertex(V), metrics=['accuracy'])
+  my_network.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
+  lr_sched = step_decay_schedule(initial_lr=1e-3, decay_factor=0.9, step_size=1)
   history = my_network.fit_generator(generator=batch_generator(trainX, trainY, batch_size),
                     epochs=epochs, steps_per_epoch=(trainX.shape[0]/batch_size), use_multiprocessing=True,
-                    validation_data=batch_generator(testX, testY, batch_size), validation_steps = (testX.shape[0]/batch_size))
+                    validation_data=batch_generator(testX, testY, batch_size), validation_steps = (testX.shape[0]/batch_size), callbacks=[lr_sched])
   my_network.save(save_prefix + 'model.h5')
   np.save(save_prefix+'evaluate.npy', my_network.evaluate(reconstruct_image(testX), testY))
-  #Plotting the ROC curve
   predY = my_network.predict_proba(reconstruct_image(testX))
   auc = roc_auc_score(testY, predY)
   np.save(save_prefix+'roc_param.npy', roc_curve(testY, predY))
   fpr, tpr, thr = roc_curve(testY, predY)
-  # Find the rejection at 90% accuracy.
   effindex = np.abs(tpr-0.9).argmin()
   effpurity = 1.-fpr[effindex]
   np.save(save_prefix+'roc_value.npy', np.array([effpurity]))
@@ -179,13 +180,13 @@ def train(data, labels, save_prefix=''):
 def main():
   #python /projectnb/snoplus/machine_learning/prototype/network.py --signallist C10_j.dat --bglist C10_j.dat --signal Te130 --bg C10 --time_index 9 --qe_index 6
   parser = argparse.ArgumentParser()
-  parser.add_argument("--signallist", type = str, default = "Te130.dat")
-  parser.add_argument("--bglist", type = str, default = "C10E.dat")
+  parser.add_argument("--signallist", type = str, default = "/projectnb/snoplus/machine_learning/data/training_log/KL_smeared_isotropic/Xe136dVrndVtx_3p0mSphere.dat")
+  parser.add_argument("--bglist", type = str, default = "/projectnb/snoplus/machine_learning/data/training_log/KL_smeared_isotropic/C10dVrndVtx_3p0mSphere.dat")
   parser.add_argument("--signal", type = str, default = "Te130")
   parser.add_argument("--bg", type = str, default = "C10")
-  parser.add_argument("--outdir", type = str, default = "/projectnb/snoplus/sphere_data/training_output")
-  parser.add_argument("--time_index", type = int, default = 3)
-  parser.add_argument("--qe_index", type = int, default = 0)
+  parser.add_argument("--outdir", type = str, default = "/projectnb/snoplus/sphere_data/Xe136_C10_direction/")
+  parser.add_argument("--time_index", type = int, default = 5)
+  parser.add_argument("--qe_index", type = int, default = 5)
 
   args = parser.parse_args()
 
@@ -198,25 +199,34 @@ def main():
   #########################################################
   time_index = args.time_index
   qe_index = args.qe_index
-  json_name = str(time_index) + '_' + str(qe_index) + '.json'
-  signal_images = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.signallist, 'r')) if component in filename] for component in ['data_', 'indices_', 'indptr_']]
+  json_name = str(time_index) + '_' + str(qe_index)
+  signal_images_list = [str(filename.strip()) for filename in list(open(args.signallist, 'r'))]
+  signal_images = create_table(signal_images_list, json_name)
+  signal_images = np.array(signal_images, dtype=object)
+  signal_images = signal_images[:].todense()
+  print(signal_images.shape)
 
-  #create objective numpy array with each entry as a sparse matrix.
-  signal_images = ceate_table(signal_images)
+  signal_vertex = create_table(signal_images_list, 'vertex')
+  signal_vertex = np.array(signal_vertex)
 
-  signal_vertex = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.signallist, 'r')) if component in filename] for component in ['vertex_']]
-  signal_vertex = np.array(signal_vertex[0][0])
-  print signal_vertex.shape
+  signal_direction = create_table(signal_images_list, 'direction')
+  signal_direction = np.array(signal_direction)
+  # #create objective numpy array with each entry as a sparse matrix.
+  # signal_images = ceate_table(signal_images)
 
-  signal_direction = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.signallist, 'r')) if component in filename] for component in ['direction_']]
-  signal_direction = np.array(signal_direction[0][0])
-  print signal_direction.shape
+  # signal_vertex = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.signallist, 'r')) if component in filename] for component in ['vertex_']]
+  # signal_vertex = np.array(signal_vertex[0][0])
+  # print(signal_vertex.shape)
 
-  save_prefix = os.path.join(args.outdir, "%s_%s_qe%d_time%d_%d_" % (
-      args.signal, args.bg, args.qe_index, args.time_index, time.time()))
+  # signal_direction = [[load_data(str(filename.strip() + '/' + json_name)) for filename in list(open(args.signallist, 'r')) if component in filename] for component in ['direction_']]
+  # signal_direction = np.array(signal_direction[0][0])
+  # print(signal_direction.shape)
+
+  #save_prefix = os.path.join(args.outdir, "%s_%s_qe%d_time%d_%d_" % (
+  #    args.signal, args.bg, args.qe_index, args.time_index, time.time()))
   #print(save_prefix)
 
-  train(signal_images, signal_direction, vertex, save_prefix)
+  #train(signal_images, signal_direction)
 
 
 main()
