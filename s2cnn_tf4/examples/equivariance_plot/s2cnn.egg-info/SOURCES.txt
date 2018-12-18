@@ -1,0 +1,4 @@
+s2cnn.egg-info/PKG-INFO
+s2cnn.egg-info/SOURCES.txt
+s2cnn.egg-info/dependency_links.txt
+s2cnn.egg-info/top_level.txt
