@@ -7,6 +7,8 @@
 # Purpose:
 # This code varies the photocoverage of given detector by expanding the 
 # radius of the PMT until they start to overlap.
+# The evaluation of overlapping is conducted in a Monte Carlo manner by
+# sampling points on the rim of each PMT at different radius
 #############################################################################
 import argparse
 import math

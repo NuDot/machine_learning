@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import json
+import pickle
 
 import pandas as pd
 from scipy import sparse
@@ -10,11 +11,12 @@ import numpy as np
 from datetime import datetime
 
 import numpy as np
-from keras.callbacks import LearningRateScheduler
+# from keras.callbacks import LearningRateScheduler
+from tqdm import tqdm
 
-DIM1 = 136
-DIM2 = 68
-DIM3 = 40
+DIM1 = 50
+DIM2 = 25
+DIM3 = 34
 
 def label_data(signal_images, background_images):
   labels = np.array([1] * len(signal_images) + [0] * len(background_images))
@@ -75,21 +77,25 @@ def load_data(npy_filename):
     #print datetime.now() - startTime
   return data.values.tolist()
 
-def ceate_table(sparse_set):
-  data_set, indices_set, indptr_set = sparse_set
-  data = data_set[0]
-  indices = indices_set[0]
-  indptr = indptr_set[0]
-  for index in range(1,len(data_set)):
-    data += data_set[index]
-    indices += indices_set[index]
-    indptr += indptr_set[index]
-  data_array = np.ndarray((len(data), len(data[0])), dtype=object)
-  for evt in range(len(data)):
-    for time in range(len(data[0])):
-      data_array[evt][time] = sparse.csr_matrix((data[evt][time], indices[evt][time], indptr[evt][time]), shape=(DIM1, DIM2), dtype=float)
-  print(data_array.shape)
-  return data_array
+def create_table(file_list, load_strings, dense=False):
+  event_dict = {el:[] for el in load_strings}
+  for file in tqdm(file_list):
+    try:
+      with open(file, 'rb') as f:
+        while True:
+          try:
+            event = pickle.load(f, encoding='latin1')
+            #print(load_strings, '#', event)
+            for load in load_strings:
+              event_dict[load].append(event[load])
+          except:
+          #except:
+            break
+    except:
+      '''
+      do nothing
+      '''
+  return event_dict
 
 def step_decay_schedule(initial_lr=1e-3, decay_factor=0.75, step_size=10):
     '''
@@ -100,18 +106,17 @@ def step_decay_schedule(initial_lr=1e-3, decay_factor=0.75, step_size=10):
     
     return LearningRateScheduler(schedule)
 
-
-def ceate_table_dense(sparse_set, DIM1 = 50, DIM2 = 25):
-  data_set, indices_set, indptr_set = sparse_set
-  data = data_set[0]
-  indices = indices_set[0]
-  indptr = indptr_set[0]
-  for index in range(1,len(data_set)):
-    data += data_set[index]
-    indices += indices_set[index]
-    indptr += indptr_set[index]
-  data_array = np.ndarray((len(data), len(data[0]), DIM1, DIM2))
-  for evt in range(len(data)):
-    for time in range(len(data[0])):
-      data_array[evt][time] = sparse.csr_matrix((data[evt][time], indices[evt][time], indptr[evt][time]), shape=(DIM1, DIM2), dtype=float).todense()
-  return data_array
+# def ceate_table_dense(sparse_set, DIM1 = 50, DIM2 = 25):
+#   data_set, indices_set, indptr_set = sparse_set
+#   data = data_set[0]
+#   indices = indices_set[0]
+#   indptr = indptr_set[0]
+#   for index in range(1,len(data_set)):
+#     data += data_set[index]
+#     indices += indices_set[index]
+#     indptr += indptr_set[index]
+#   data_array = np.ndarray((len(data), len(data[0]), DIM1, DIM2))
+#   for evt in range(len(data)):
+#     for time in range(len(data[0])):
+#       data_array[evt][time] = sparse.csr_matrix((data[evt][time], indices[evt][time], indptr[evt][time]), shape=(DIM1, DIM2), dtype=float).todense()
+#   return data_array

@@ -22,8 +22,12 @@ from tqdm import tqdm
 
 #Global Variables
 PMT_POSITION = []
+# This file loads all KamLAND PMT position/ The position is in form of
+# index   x     y    z
+# where x,y,z is in unit of centimeter
 for pmt in np.loadtxt("/projectnb/snoplus/machine_learning/prototype/pmt.txt").tolist():
   if (len(pmt)):
+    # only use 17inch PMT
     if (pmt[-1] == 17.0):
       PMT_POSITION.append([pmt[-4], pmt[-3], pmt[-2]])
 N_PMTS = len(PMT_POSITION)
@@ -111,7 +115,7 @@ def calculate_angle(vec1, vec2):
 def xyz_to_row_col(x, y, z, rows=ROWS, cols=COLS):
    return phi_theta_to_row_col(*xyz_to_phi_theta(x, y, z), rows=rows, cols=cols)
 
-# Making a random decision based on the input pressure, used to vary quantum efficiency.
+# Making a random decision based on the input pressure, use this to vary quantum efficiency.
 def random_decision(pressure):
     decision = False
     if (pressure > MAX_PRESSURE) or (pressure == 0):
@@ -131,7 +135,7 @@ def rotated(feature_map, theta, phi):
     feature_map = np.concatenate((right, left), axis = 1)
   return feature_map
 
-# Set up the clocl to start ticking on the first incoming photon of a given events.
+# Set up the clock to start ticking on the first incoming photon of a given events.
 def set_clock(tree, evt):
   tree.GetEntry(evt)
   time_array = []
@@ -147,68 +151,68 @@ def savefile(saved_file, appendix, filename, pathname):
         with open(filename, 'w') as datafile:
           json.dump(saved_file, datafile)
 
-# Smear the input photon time as a gaussian with given TTS, for KamLAND it's 1.0s
+# Smear the input photon time as a gaussian with given TTS, for KamLAND it's 1.0ns
 def smearing_time(time):
   return np.random.normal(loc=time, scale=1.0)
 
 # Transcribe hits to a 6D pressure maps.
-def transcribe_hits(input, theta, phi, outputdir, start_evt, end_evt, elow, ehi):
-  current_clock = clock(0)
-  f1 = TFile(input)
-  tree = f1.Get("epgTree")
-  n_evts = tree.GetEntries()
-  end_evt = min(n_evts, end_evt)
-  n_qe_values = MAX_PRESSURE + 1
-  photocoverage_scale = list(np.linspace(0.2159, 0.3173, 9))
-  shrink_list = [] # Shrink event out of the dataset that failed the energy cut
-  # feature map = [Photocoverage Pressure, QE Pressure, event, clock tick, theta, phi]
-  feature_map_collections = np.zeros(((((len(photocoverage_scale), n_qe_values, (end_evt-start_evt), current_clock.clock_size(), ROWS, COLS)))))
-  for evt_index in tqdm(range(start_evt, end_evt)):
-    tree.GetEntry(evt_index)
-    if (tree.edep < elow) or (tree.edep > ehi):
-      shrink_list.append(evt_index)
-      continue
-    current_clock = set_clock(tree, evt_index)
-    for i in range(tree.N_phot):
-    #for i in range(10):
-      ###############################################
-      pmt_index, detector_radius, pmt_angle = pmt_setup([tree.x_hit[i],tree.y_hit[i],tree.z_hit[i]])
-      ###############################################
-      for pressure_pc in photocoverage_scale:
-        if (pmt_allocator(pmt_angle, detector_radius, pressure_pc)):
-          row, col = xyz_to_row_col(PMT_POSITION[pmt_index][0], PMT_POSITION[pmt_index][1], PMT_POSITION[pmt_index][2])
-          for pressure_pe in range (0, n_qe_values):
-            # tree.PE_creation[i] == true means the photon passes the intrinsic MC QE mechanism, therefore it should always be accepted.
-            if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
-              time_index = current_clock.tick(smearing_time(tree.true_time[i]))
-              feature_map_collections[photocoverage_scale.index(pressure_pc)][pressure_pe][evt_index - start_evt][time_index][row][col] += 1.0
-  feature_map_collections = np.delete(feature_map_collections, shrink_list ,2)# Clear empty event that failed energy cut
-  dim1, dim2, dim3, dim4, dim5, dim6 = feature_map_collections.shape
-  lst = np.zeros((dim3,dim4,1))
-  input_name = os.path.basename(input).split('.')[0]
-  data_path = os.path.join(outputdir, "data_%s.%d.%d" % (input_name, start_evt, end_evt))
-  indices_path = os.path.join(outputdir, "indices_%s.%d.%d" % (input_name, start_evt, end_evt))
-  indptr_path = os.path.join(outputdir, "indptr_%s.%d.%d" % (input_name, start_evt, end_evt))
-  data = lst.tolist()
-  indices = lst.tolist()
-  indptr = lst.tolist()
-  # Converting the feature map to a sparse matrix, this both save harddisk spaces and save memory for training.
-  for qcindex, qc in enumerate(feature_map_collections):
-    for qeindex, qe in enumerate(qc): 
-      currentEntry = qe
-      if (qe.max() != 0):
-        currentEntry = np.divide(qe, (1.2 * qe.max()))
-      for evt_index, evt in enumerate(currentEntry):
-        for time_index, maps in enumerate(evt):
-          sparse_map = sparse.csr_matrix(maps)
-          data[evt_index][time_index] = map(float, sparse_map.data)
-          indices[evt_index][time_index] = map(int, sparse_map.indices)
-          indptr[evt_index][time_index] = map(int, sparse_map.indptr)
-      qcqename = str(qcindex) + '_' + str(qeindex) + '.json'
-      savefile(data, 'data', qcqename, data_path)
-      savefile(indices, 'indices', qcqename, indices_path)
-      savefile(indptr, 'indptr', qcqename, indptr_path)
-  return feature_map_collections
+def transcribe_hits(input, outputdir, start_evt, end_evt, elow, ehi):
+    current_clock = clock(0) # Set up clock
+
+    # Read ROOT file
+    f1 = TFile(input)
+    tree = f1.Get("epgTree")
+    n_evts = tree.GetEntries()
+
+
+    end_evt = min(n_evts, end_evt)
+    n_qe_values = MAX_PRESSURE + 1
+    # photocoverage is varied by varying the size of KamLAND-Zen PMT
+    # 0.2159 is the current KLZ PMT size (in meter)
+    # 0.3173 is the maximum KLZ PMT size without overlapping
+    photocoverage_scale = list(np.linspace(0.3173, 0.2159, 9))
+    vertex_list = []
+    direction_list = []
+    #[photocoverage, QE, nevent, clock_tick, theta, phi]
+    feature_map_collections = np.zeros(((((len(photocoverage_scale), n_qe_values, (end_evt-start_evt), current_clock.clock_size(), ROWS, COLS)))))
+    input_name = os.path.basename(input).split('.')[0]
+    with open(os.path.join(outputdir, "eventfile_%s.%d.%d.pickle" % (input_name, start_evt, end_evt)), 'wb') as handle:
+        for evt_index in tqdm(range(start_evt, end_evt)):
+            event_dict = {}
+            tree.GetEntry(evt_index)
+            rlength = (tree.trueVtxX**2 + tree.trueVtxY**2 + tree.trueVtxZ**2)**0.5
+            #Making energy cut and vertex position cut
+            if (tree.edep < elow) or (tree.edep > ehi) or (rlength > 150.4):
+                continue
+
+            # Save event ID, event vertex position and event direction
+            event_dict['id'] = evt_index
+            event_dict['vertex'] = [tree.trueVtxX,tree.trueVtxY,tree.trueVtxZ]
+            event_dict['direction'] = [tree.trueDirX,tree.trueDirY,tree.trueDirZ]
+            current_clock = set_clock(tree, evt_index)
+
+            # Loop through all photon in each events
+            for i in range(tree.N_phot):
+                # Setup PMT
+                pmt_index, detector_radius, pmt_angle = pmt_setup([tree.x_hit[i],tree.y_hit[i],tree.z_hit[i]])
+                # Loop through photocoverage and QE
+                for pressure_pc in photocoverage_scale:
+                    if (pmt_allocator(pmt_angle, detector_radius, pressure_pc)):
+                        col, row = xyz_to_row_col(PMT_POSITION[pmt_index][0], PMT_POSITION[pmt_index][1], PMT_POSITION[pmt_index][2])
+                        for pressure_pe in range (0, n_qe_values):
+                            if (tree.PE_creation[i]) or random_decision(MAX_PRESSURE-pressure_pe):
+                                true_time = time_extend(tree.true_time[i], tree.photon_wavelength[i])
+                                time_index = current_clock.tick(smearing_time(true_time))
+                                feature_map_collections[photocoverage_scale.index(pressure_pc)][pressure_pe][evt_index - start_evt][time_index][row][col] += 1.0
+            # Dump allocated PMT hit map into .pickle file as sparse matrix
+            for qcindex, qc in enumerate(feature_map_collections):
+                for qeindex, qe in enumerate(qc):
+                        time_sequence = []
+                        for time_index, maps in enumerate(qe[evt_index - start_evt]):
+                             time_sequence.append(sparse.csr_matrix(maps))
+                        event_dict[str(qcindex) + '_' + str(qeindex)] = time_sequence
+            pickle.dump(event_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    return feature_map_collections
 
 
 
@@ -218,9 +222,6 @@ def main():
   parser = argparse.ArgumentParser()
   parser.add_argument("--input", default="/projectnb/snoplus/sphere_data/sph_out_1el_2p53_MeV_15k.root")
   parser.add_argument("--outputdir", default="/projectnb/snoplus/sphere_data")
-  parser.add_argument("--type", "-t", help="Type of MC files, 1 ring or 2 ring", default = 1)
-  parser.add_argument("--theta","-th", help="Rotate Camera with given theta(0 - 2pi)",type = float, default = 0)
-  parser.add_argument("--phi","-ph", help="Rotate Camera with given phi(0 - pi)",type = float, default = 0)
   parser.add_argument("--start", help="start event",type = int, default = 0)
   parser.add_argument("--end", help="end event",type = int, default = 1000000000)
   parser.add_argument("--elow", help="lower energy cut",type = float, default = 0.0)
@@ -228,7 +229,7 @@ def main():
   args = parser.parse_args()
 
 
-  fmc = transcribe_hits(input=args.input, theta=args.theta, phi=args.phi, outputdir=args.outputdir, start_evt=args.start, end_evt=args.end, elow=args.elow, ehi=args.ehi)
+  fmc = transcribe_hits(input=args.input, outputdir=args.outputdir, start_evt=args.start, end_evt=args.end, elow=args.elow, ehi=args.ehi)
 
 
 
