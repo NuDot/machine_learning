@@ -165,9 +165,7 @@ ax.tick_params(axis = 'both', which = 'major', labelsize = 25)
 if (HANDLE == 1):
   #plt.tight_layout()
   plt.savefig(PLOT_DIR  + 'Pressure_map_3m_Sphere.pdf', format='pdf', dpi=600)
-  #print "Abigail Williams"
   plt.show()
-  #np.save('1elROCPM.npy', loss)
 elif (HANDLE == 2):
   #plt.tight_layout()
   plt.savefig( PLOT_DIR  + 'Pressure_map_center.pdf', format='pdf', dpi=600)
