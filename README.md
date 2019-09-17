@@ -28,8 +28,7 @@ Adding Spherical CNN feature modified from https://github.com/jonas-koehler/s2cn
 
 * **Step 1** : Given Monte Carlo file, preprocess it using preprocessing/processing_sparse_time.py to convert it to a pmt hitmap.
   
-  
- **Output** : eventfile.pickles for each .root file
+  **Output** : eventfile.pickles for each .root file
   
   
   
