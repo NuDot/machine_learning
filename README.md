@@ -20,7 +20,9 @@ data: Data processing script to be use on BU SCC cluster.
 
 Adding Spherical CNN feature modified from https://github.com/jonas-koehler/s2cnn
 
-Please cite DOI: 10.1016/j.nima.2019.162604 if you intend to use this work.
+Please cite the following paper if you used this code:
+
+DOI: 10.1016/j.nima.2019.162604
 
 
 # A full study contains:
